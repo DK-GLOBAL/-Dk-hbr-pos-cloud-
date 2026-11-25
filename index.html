@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>DK Grand Hotel</title><meta name="theme-color" content="#b08d57"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#14181f;--gold:#b08d57;--cream:#faf7f2;--line:#e6dfd3;--mut:#6f6a60;--ok:#2f7d5b;--bad:#b3392f}
+*{box-sizing:border-box}body{margin:0;font:15px/1.6 Inter,system-ui,sans-serif;color:var(--ink);background:var(--cream)}
+h1,h2,h3,.serif{font-family:"Playfair Display",Georgia,serif;font-weight:500;margin:0}
+button,input,select,textarea{font:inherit;color:inherit}button{cursor:pointer}
+input,select,textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.mut{color:var(--mut);font-size:13px}.wrap{max-width:1080px;margin:0 auto;padding:0 18px}
+.nav{position:sticky;top:0;z-index:5;background:rgba(20,24,31,.94);color:#fff;padding:12px 0}.nav .wrap{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.logo{font-family:"Playfair Display",serif;font-size:20px;letter-spacing:.5px}.logo b{color:var(--gold);font-weight:500}
+.btn{background:var(--gold);color:#fff;border:0;border-radius:8px;padding:10px 20px;font-weight:600}.btn.o{background:transparent;border:1px solid var(--gold);color:var(--gold)}
+.hero{min-height:86vh;display:flex;align-items:center;color:#fff;background:radial-gradient(ellipse at 75% 15%,rgba(176,141,87,.38),transparent 55%),repeating-linear-gradient(135deg,rgba(255,255,255,.025) 0 2px,transparent 2px 14px),linear-gradient(160deg,#0e1218,#1b2330 62%,#2b303b)}
+.hero h1{font-size:clamp(36px,7vw,68px);line-height:1.1;margin:10px 0 14px}.hero p{max-width:520px;color:#d9d4c9;font-size:17px}
+.eyebrow{color:var(--gold);letter-spacing:3px;font-size:12px;text-transform:uppercase}.rule{width:70px;height:2px;background:var(--gold);margin:18px 0}
+.sec{padding:64px 0}.sec h2{font-size:clamp(26px,4vw,38px);margin-bottom:6px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:24px}
+.sv{background:#fff;border:1px solid var(--line);border-radius:14px;padding:22px}.sv i{color:var(--gold);font-style:normal;font-size:22px}.sv h3{font-size:20px;margin:6px 0}.sv button{margin-top:10px}
+.bk{background:#fff;border:1px solid var(--line);border-radius:16px;padding:24px;max-width:760px;margin:24px auto 0}
+.fg{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}.fg label{display:block;font-size:12px;color:var(--mut);margin-bottom:3px}
+footer{background:var(--ink);color:#c9c4b9;padding:34px 0;font-size:14px}footer a,footer button{color:var(--gold);background:none;border:0;padding:0;text-decoration:underline}
+.ok{background:#e9f4ee;color:var(--ok);padding:14px;border-radius:10px;margin-top:14px}.err{color:var(--bad);font-size:13px;margin-top:8px;min-height:18px}
+.ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:20;align-items:center;justify-content:center;padding:16px}
+.dlg{background:#fff;border-radius:14px;padding:22px;width:min(360px,100%)}.dlg input{margin:6px 0}
+#app{display:none;max-width:1100px;margin:0 auto;padding:12px;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.chip{border:1px solid var(--line);background:#fff;border-radius:20px;padding:6px 14px}.chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px}
+.split{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:10px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(125px,1fr));gap:8px}
+.item{text-align:left;background:var(--cream);border:1px solid var(--line);border-radius:10px;padding:12px 10px}.item b{display:block;font-weight:500}.item span{font-size:12px;color:var(--mut)}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 0;flex-wrap:wrap}.fl{display:grid;gap:6px;margin-bottom:8px}
+.pay{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}.pay button,.go{background:var(--ok);color:#fff;border:0;border-radius:8px;padding:10px;font-weight:600}.go{width:100%;margin-top:8px;background:var(--ink)}
+.sm{border:1px solid var(--line);background:#fff;border-radius:8px;padding:5px 10px}.bad{color:var(--bad)}.low{background:#fbe9e7;color:var(--bad);border-radius:6px;padding:1px 8px;font-size:12px}
+.mets{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:8px}.met{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px}.met b{display:block;font-size:22px;font-weight:500}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:8px;display:none;z-index:40}
+#rcpt{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;align-items:flex-start;justify-content:center;overflow:auto;padding:20px}
+.paper{background:#fff;color:#000;width:min(340px,100%);padding:16px;font:13px/1.5 ui-monospace,Menlo,Consolas,monospace}.paper hr{border:0;border-top:1px dashed #000}.paper .ctr{text-align:center}.paper .r{display:flex;justify-content:space-between;gap:8px}
+@media(max-width:700px){.split{grid-template-columns:1fr}}
+@media print{body>*:not(#rcpt){display:none!important}#rcpt{position:static;background:none;display:block!important;padding:0}.paper{width:80mm;padding:0}.noprint{display:none!important}}
+</style></head><body>
+<div id="land">
+<div class="nav"><div class="wrap"><div class="logo" id="lg1"></div><div><a href="#book" class="btn" style="text-decoration:none;display:inline-block">Book now</a></div></div></div>
+<header class="hero"><div class="wrap"><div class="eyebrow" id="ad"></div><h1 id="hn"></h1><div class="rule"></div><p id="tg"></p><p style="margin-top:22px"><a href="#book" class="btn" style="text-decoration:none;display:inline-block">Plan your visit</a> <a href="#services" class="btn o" style="text-decoration:none;display:inline-block">Our services</a></p></div></header>
+<section class="sec" id="services"><div class="wrap"><div class="eyebrow">Stay · Dine · Unwind</div><h2>Everything you need, under one roof</h2><div class="cards" id="cards"></div></div></section>
+<section class="sec" id="book" style="background:#f1ebe0"><div class="wrap"><div class="eyebrow" style="text-align:center">Book online</div><h2 style="text-align:center">Tell us what you need. We’ll have it ready.</h2>
+<form class="bk" id="bf"><div class="fg"><div><label>Your name</label><input name="name" required autocomplete="name"></div><div><label>Phone (shown on your receipt)</label><input name="phone" required inputmode="tel" placeholder="0712 345 678"></div>
+<div><label>Email (optional)</label><input name="email" type="email"></div><div><label>Service</label><select name="service" id="sv"></select></div>
+<div><label>Date</label><input name="date" type="date" required id="dt"></div><div><label>Time</label><input name="time" type="time" value="12:00"></div><div><label>Guests</label><input name="guests" type="number" min="1" value="2"></div></div>
+<div style="margin-top:12px"><label class="mut">What should we prepare? (room type, meal, treatment, special needs)</label><textarea name="notes" rows="3"></textarea></div>
+<button class="btn" style="margin-top:14px;width:100%">Send booking request</button><div class="err" id="be"></div><div id="bo"></div></form></div></section>
+<footer><div class="wrap" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><b class="serif" id="fn" style="font-size:18px"></b><br><span id="fa"></span></div><div>Powered by DK HBR POS · <button data-a="lgo">Staff login</button></div></div></footer>
+</div>
+
+<div id="app"></div>
+<div class="ov" id="lg"><div class="dlg"><h3>Staff sign in</h3>
+<div id="lf"><input id="ln" placeholder="Your name" autocomplete="username"><input id="lp" type="password" inputmode="numeric" placeholder="PIN" autocomplete="current-password"><button class="go" data-a="login">Sign in</button></div>
+<div id="sf" style="display:none"><p class="mut">First time. Create the owner account with your setup code.</p><input id="sc" placeholder="Setup code"><input id="sn" placeholder="Owner name"><input id="sp" type="password" inputmode="numeric" placeholder="PIN (4 to 8 digits)"><button class="go" data-a="setup">Create owner</button></div>
+<div class="err" id="le"></div><button class="sm" data-a="lgx" style="margin-top:6px">Close</button></div></div>
+<div id="rcpt"></div><div id="toast" role="status"></div>
+<script>
+const HOTEL={name:"DK Grand Hotel",tag:"Rest well. Dine well. Be well. Book your stay, table or treatment online and we’ll have everything ready when you arrive.",phone:"+254 700 000 000",addr:"Nakuru, Kenya"};
+const SV=[["Rooms and suites","Comfortable rooms, made up and ready for your arrival."],["Restaurant table","Reserve a table and tell us what to prepare."],["Bar and lounge","Evening drinks and a corner kept just for you."],["Spa and wellness","Massage and treatments, booked to your time."],["Events and conferences","Meetings, weddings and celebrations, set up in advance."],["Airport or town transfer","A driver waiting with your name on it."]];
+const $=id=>document.getElementById(id),esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const money=n=>"KSh "+Math.round(n).toLocaleString(),SEN=["owner","manager","supervisor"],ld=d=>new Date(d).toLocaleDateString([],{weekday:"short",day:"numeric",month:"short"});
+const lymd=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+let S={t:sessionStorage.getItem("dkt")||"",me:null,menu:[],orders:[],bookings:[],stock:[],staff:[]},tab="pos",per=1,bf="up",cart={lines:{},ref:"",name:"",phone:"",id:null,bk:null,dept:"Restaurant"},poll;
+document.title=HOTEL.name;$("lg1").innerHTML=esc(HOTEL.name).replace(/^(\S+)/,"<b>$1</b>");$("hn").textContent=HOTEL.name;$("tg").textContent=HOTEL.tag;$("ad").textContent=HOTEL.addr;$("fn").textContent=HOTEL.name;$("fa").textContent=HOTEL.addr+" · "+HOTEL.phone;
+$("cards").innerHTML=SV.map((s,i)=>`<div class="sv"><i>✦</i><h3>${s[0]}</h3><p class="mut" style="font-size:14px">${s[1]}</p><button class="btn o" data-a="pick" data-v="${i}">Book this</button></div>`).join("");
+$("sv").innerHTML=SV.map(s=>`<option>${s[0]}</option>`).join("");$("dt").min=lymd(new Date());$("dt").value=lymd(new Date(Date.now()+864e5));
+function toast(m){const t=$("toast");t.textContent=m;t.style.display="block";clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display="none",3000)}
+async function api(a,d){const r=await fetch("/api/s",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.assign({a,t:S.t},d||{}))});const j=await r.json().catch(()=>({err:"Network problem"}));if(!r.ok){if(r.status===401&&S.me)out();throw new Error(j.err||"Something went wrong")}return j}
+$("bf").onsubmit=async e=>{e.preventDefault();$("be").textContent="";try{const f=Object.fromEntries(new FormData(e.target)),r=await api("book",f);$("bo").innerHTML=`<div class="ok"><b>Request received. Reference ${esc(r.ref)}.</b><br>We’ll call or WhatsApp you on ${esc(f.phone)} to confirm. This number will appear on your receipt.</div>`;e.target.reset();$("dt").value=lymd(new Date(Date.now()+864e5))}catch(x){$("be").textContent=x.message}};
+const can={pay:()=>S.me.role!=="waiter",sen:()=>SEN.includes(S.me.role),stf:()=>["owner","manager"].includes(S.me.role)};
+const TABS=()=>[["pos","New bill"],["bills","Bills"],["bookings","Bookings"],...(can.sen()?[["inventory","Inventory"],["menu","Menu"],["reports","Reports"]]:[]),...(can.stf()?[["staff","Staff"]]:[])];
+function enter(r){S.t=r.t;sessionStorage.setItem("dkt",r.t);S.me=r.me;$("lg").style.display="none";$("land").style.display="none";$("app").style.display="block";shell();sync();clearInterval(poll);poll=setInterval(()=>{if(!document.hidden)sync()},12000)}
+function out(){clearInterval(poll);sessionStorage.removeItem("dkt");S.t="";S.me=null;$("app").style.display="none";$("land").style.display="block"}
+async function sync(){try{Object.assign(S,await api("sync"));if(!$("v"))return;if(tab==="menu"||tab==="inventory"||tab==="staff"){const l=$("ls");if(l)({menu:lMenu,inventory:lInv,staff:lStaff})[tab]()}else if(tab!=="pos")view()}catch(e){}}
+function shell(){$("app").innerHTML=`<div class="top"><div class="logo" style="font-size:20px">${esc(HOTEL.name)}<div class="mut" style="font-family:Inter">DK HBR POS</div></div><div><span class="chip">${esc(S.me.name)} · ${esc(S.me.role)}</span> <button class="sm" data-a="out">Sign out</button></div></div><div class="chips">${TABS().map(t=>`<button class="chip" data-a="tab" data-v="${t[0]}">${t[1]}</button>`).join("")}</div><div id="v"></div>`;view()}
+function view(){document.querySelectorAll("#app .chips [data-a=tab]").forEach(b=>b.classList.toggle("on",b.dataset.v===tab));({pos:vPos,bills:vBills,bookings:vBook,inventory:vInv,menu:vMenu,reports:vRep,staff:vStaff})[tab]()}
+const ctot=()=>Object.values(cart.lines).reduce((a,l)=>a+l.p*l.q,0);
+function vPos(){
+ const it=S.menu.filter(m=>m.dept===cart.dept),L=Object.values(cart.lines),t=ctot();
+ $("v").innerHTML=`<div class="split"><div class="card"><div class="chips">${["Restaurant","Bar","Spa","Hotel"].map(d=>`<button class="chip ${d===cart.dept?"on":""}" data-a="dept" data-v="${d}">${d==="Hotel"?"Rooms and extras":d}</button>`).join("")}</div><div class="grid">${it.map(m=>`<button class="item" data-a="add" data-v="${m.id}"><b>${esc(m.name)}</b><span>${money(m.price)}</span></button>`).join("")||'<p class="mut">Nothing here yet. Seniors add items under Menu.</p>'}</div></div>
+ <div class="card"><div class="row"><b>${cart.id?"Editing bill":"New bill"}</b><button class="sm" data-a="clr">Clear</button></div><div class="fl"><input id="gn" placeholder="Guest name" value="${esc(cart.name)}"><input id="gp" placeholder="Guest phone (prints on receipt)" inputmode="tel" value="${esc(cart.phone)}"><input id="gr" placeholder="Room, table or booking ref" value="${esc(cart.ref)}"></div>
+ <div style="border-top:1px solid var(--line);border-bottom:1px solid var(--line);min-height:56px;padding:4px 0">${L.map(l=>`<div class="row"><span>${esc(l.n)}</span><span><button class="sm" data-a="qty" data-v="${l.id}:-1">−</button> ${l.q} <button class="sm" data-a="qty" data-v="${l.id}:1">+</button> ${money(l.p*l.q)}</span></div>`).join("")||'<p class="mut">Tap an item to start.</p>'}</div>
+ <div class="row mut"><span>VAT 16% (included)</span><span>${money(t*16/116)}</span></div><div class="row"><b>Total</b><b style="font-size:20px">${money(t)}</b></div>
+ <button class="go" data-a="save">Save bill and send</button>${can.pay()?`<div class="pay">${["Cash","M-Pesa","Card","Room"].map(p=>`<button data-a="pay" data-v="${p}">${p==="Room"?"Room charge":p}</button>`).join("")}</div>`:'<p class="mut">Cashiers and seniors take payment.</p>'}</div></div>`}
+async function save(pay){
+ const L=Object.values(cart.lines);if(!L.length)return toast("Add items first");
+ if(pay&&cart.phone.replace(/\D/g,"").length<9)return toast("Enter the guest’s phone number. It prints on the receipt.");
+ if(pay==="Room"&&!cart.ref.trim())return toast("Enter the room number first");
+ const r=await api("order",{id:cart.id,lines:L,name:cart.name,phone:cart.phone,ref:cart.ref,pay:pay||null});
+ if(cart.bk)api("upd",{c:"bookings",id:cart.bk,patch:{status:pay?"Done":"Arrived"}}).catch(()=>{});
+ cart={lines:{},ref:"",name:"",phone:"",id:null,bk:null,dept:cart.dept};await sync();
+ if(pay){toast("Paid "+money(r.o.total));showRc(r.o)}else{toast("Bill saved");vPos()}}
+function vBills(){
+ const op=S.orders.filter(o=>o.status==="open"),pd=S.orders.filter(o=>o.status==="paid").slice(0,30);
+ $("v").innerHTML=`<b>Open bills</b><div class="mets" style="margin-top:6px;grid-template-columns:repeat(auto-fill,minmax(250px,1fr))">${op.map(o=>`<div class="card"><div class="row"><b>#${o.no} ${esc(o.ref||o.name||"Walk-in")}</b><span class="mut">${esc(o.by)}</span></div><div class="mut">${o.lines.map(l=>l.q+"× "+esc(l.n)).join(", ")}</div><div class="row"><b>${money(o.total)}</b><span><button class="sm" data-a="open" data-v="${o.id}">Open</button>${can.sen()?` <button class="sm bad" data-a="void" data-v="${o.id}">Void</button>`:""}</span></div></div>`).join("")||'<p class="mut">No open bills.</p>'}</div>
+ <b>Recent paid</b>${pd.map(o=>`<div class="card row"><span>#${o.no} ${esc(o.name||o.ref||"Walk-in")} <span class="mut">${esc(o.phone||"")} · ${esc(o.pay)}</span></span><span>${money(o.total)} <button class="sm" data-a="rc" data-v="${o.id}">Receipt</button></span></div>`).join("")||'<p class="mut">No paid bills yet.</p>'}`}
+function vBook(){
+ const td=lymd(new Date()),b=S.bookings.filter(x=>bf==="all"||x.date>=td).sort((x,y)=>(x.date+x.time).localeCompare(y.date+y.time));
+ $("v").innerHTML=`<div class="chips"><button class="chip ${bf==="up"?"on":""}" data-a="bf" data-v="up">Today and upcoming</button><button class="chip ${bf==="all"?"on":""}" data-a="bf" data-v="all">All</button></div>`+(b.map(x=>`<div class="card"><div class="row"><b>${ld(x.date+"T12:00")} · ${esc(x.time)} · ${esc(x.service)}</b><span class="mut">${esc(x.ref)}</span></div><div>${esc(x.name)} · ${x.guests} guest(s) · <b>${esc(x.phone)}</b></div>${x.notes?`<div class="mut">Prepare: ${esc(x.notes)}</div>`:""}<div class="row"><select data-a="bst" data-v="${x.id}" style="width:auto">${["Requested","Confirmed","Arrived","Done","Cancelled"].map(s=>`<option ${s===x.status?"selected":""}>${s}</option>`).join("")}</select><span>${["Done","Cancelled"].includes(x.status)?"":`<button class="sm" data-a="bk" data-v="${x.id}">Start bill</button> `}<a href="https://wa.me/${esc(String(x.phone).replace(/\D/g,"").replace(/^0/,"254"))}" target="_blank" rel="noopener">WhatsApp</a></span></div></div>`).join("")||'<p class="mut">No bookings to show.</p>')}
+function vInv(){$("v").innerHTML=`<div class="card"><b>Add stock item</b><div class="fg" style="margin-top:6px"><input id="in" placeholder="Item (e.g. Tusker 500ml)"><input id="iq" placeholder="Quantity" inputmode="numeric"><input id="iu" placeholder="Unit (bottle, kg)"><input id="im" placeholder="Low-stock level" inputmode="numeric"><button class="go" style="margin:0" data-a="stadd">Add</button></div></div><div id="ls"></div>`;lInv()}
+function lInv(){$("ls").innerHTML=S.stock.map(s=>`<div class="card row"><span><b>${esc(s.name)}</b> ${s.qty<=s.min?'<span class="low">Low</span>':""}<br><span class="mut">${s.qty} ${esc(s.unit)} · alert at ${s.min}</span></span><span><input id="d${s.id}" placeholder="+/-" inputmode="numeric" style="width:70px"> <button class="sm" data-a="stadj" data-v="${s.id}">Update</button> <button class="sm bad" data-a="stdel" data-v="${s.id}">Delete</button></span></div>`).join("")||'<p class="mut">No stock yet. Link items to menu items so each sale deducts stock.</p>'}
+function vMenu(){$("v").innerHTML=`<div class="card"><b>Add menu item</b><div class="fg" style="margin-top:6px"><input id="mn" placeholder="Item name"><input id="mp" placeholder="Price" inputmode="numeric"><select id="md"><option>Restaurant</option><option>Bar</option><option>Spa</option><option>Hotel</option></select><select id="ms"><option value="">Stock: not tracked</option>${S.stock.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join("")}</select><button class="go" style="margin:0" data-a="mnadd">Add</button></div></div><div id="ls"></div>`;lMenu()}
+function lMenu(){$("ls").innerHTML=S.menu.map(m=>`<div class="card row"><span>${esc(m.name)} <span class="mut">${esc(m.dept)}${m.sku?" · tracked":""}</span></span><span>${money(m.price)} <button class="sm bad" data-a="mndel" data-v="${m.id}">Delete</button></span></div>`).join("")||'<p class="mut">No items yet.</p>'}
+function vStaff(){$("v").innerHTML=`<div class="card"><b>Add staff</b><p class="mut">Waiters take orders. Cashiers also take payment. Supervisors and managers manage inventory, menu, voids and reports. Only managers and the owner manage staff.</p><div class="fg"><input id="tn" placeholder="Name"><input id="tp" placeholder="PIN (4 to 8 digits)" inputmode="numeric"><select id="tr"><option>waiter</option><option>cashier</option><option>supervisor</option><option>manager</option>${S.me.role==="owner"?"<option>owner</option>":""}</select><button class="go" style="margin:0" data-a="stfadd">Add</button></div></div><div id="ls"></div>`;lStaff()}
+function lStaff(){$("ls").innerHTML=(S.staff||[]).map(s=>`<div class="card row"><span>${esc(s.name)} <span class="mut">${esc(s.role)}</span></span>${s.name===S.me.name?'<span class="mut">You</span>':`<button class="sm bad" data-a="stfdel" data-v="${s.id}">Remove</button>`}</div>`).join("")}
+function vRep(){
+ const st=per===0?0:new Date().setHours(0,0,0,0)-(per-1)*864e5,p=S.orders.filter(o=>o.status==="paid"&&o.paidTs>=st),s=p.reduce((a,o)=>a+o.total,0);
+ const g=f=>{const m={};p.forEach(o=>f(o).forEach(([k,v])=>m[k]=(m[k]||0)+v));return Object.entries(m).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div class="row"><span>${esc(k)}</span><b>${money(v)}</b></div>`).join("")||'<p class="mut">No sales yet.</p>'};
+ $("v").innerHTML=`<div class="chips">${[[1,"Today"],[7,"7 days"],[0,"All recent"]].map(([v,n])=>`<button class="chip ${v===per?"on":""}" data-a="per" data-v="${v}">${n}</button>`).join("")}</div><div class="mets"><div class="met"><span class="mut">Sales</span><b>${money(s)}</b></div><div class="met"><span class="mut">Paid bills</span><b>${p.length}</b></div><div class="met"><span class="mut">VAT included</span><b>${money(s*16/116)}</b></div><div class="met"><span class="mut">Low stock items</span><b>${S.stock.filter(x=>x.qty<=x.min).length}</b></div></div>
+ <div class="mets" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))"><div class="card"><b>By payment</b>${g(o=>[[o.pay==="Room"?"Room charge":o.pay,o.total]])}</div><div class="card"><b>By section</b>${g(o=>o.lines.map(l=>[l.d||"Other",l.p*l.q]))}</div><div class="card"><b>By cashier</b>${g(o=>[[o.cashier||"-",o.total]])}</div></div>`}
+function showRc(o){
+ const v=o.total*16/116;
+ $("rcpt").innerHTML=`<div><div class="paper"><div class="ctr"><b style="font-size:16px">${esc(HOTEL.name)}</b><br>${esc(HOTEL.addr)}<br>Tel ${esc(HOTEL.phone)}</div><hr><div>Receipt #${o.no}<br>${new Date(o.paidTs||o.ts).toLocaleString()}</div>${o.name?`<div>Guest: ${esc(o.name)}</div>`:""}<div><b>Guest phone: ${esc(o.phone||"-")}</b></div>${o.ref?`<div>Ref: ${esc(o.ref)}</div>`:""}<hr>
+ ${o.lines.map(l=>`<div class="r"><span>${l.q} x ${esc(l.n)}</span><span>${Math.round(l.p*l.q).toLocaleString()}</span></div>`).join("")}<hr><div class="r"><span>VAT 16% incl.</span><span>${Math.round(v).toLocaleString()}</span></div><div class="r"><b>TOTAL KSh</b><b>${Math.round(o.total).toLocaleString()}</b></div><div>Paid by: ${o.pay==="Room"?"Room charge":esc(o.pay||"-")}</div><div>Served by: ${esc(o.cashier||o.by)}</div><hr><div class="ctr">Thank you for staying with us</div>
+ <div class="noprint" style="margin-top:10px;display:flex;gap:8px"><button class="go" style="margin:0" onclick="window.print()">Print</button><button class="sm" onclick="$('rcpt').style.display='none'">Close</button></div></div></div>`;$("rcpt").style.display="flex"}
+document.addEventListener("input",e=>{const i=e.target.id;if(i==="gn")cart.name=e.target.value;if(i==="gp")cart.phone=e.target.value;if(i==="gr")cart.ref=e.target.value});
+document.addEventListener("change",async e=>{const s=e.target.closest("[data-a=bst]");if(s)try{await api("upd",{c:"bookings",id:s.dataset.v,patch:{status:s.value}});sync()}catch(x){toast(x.message)}});
+document.addEventListener("click",async e=>{
+ const b=e.target.closest("[data-a]");if(!b||b.tagName==="SELECT")return;const a=b.dataset.a,v=b.dataset.v,g=i=>$(i).value.trim();
+ try{
+ if(a==="pick"){$("sv").selectedIndex=+v;$("book").scrollIntoView({behavior:"smooth"})}
+ else if(a==="lgo"){$("lg").style.display="flex";$("le").textContent="";const r=await api("status");$("lf").style.display=r.setup?"none":"block";$("sf").style.display=r.setup?"block":"none"}
+ else if(a==="lgx")$("lg").style.display="none";
+ else if(a==="login"){enter(await api("login",{name:g("ln"),pin:g("lp")}));$("lp").value=""}
+ else if(a==="setup"){enter(await api("setup",{code:g("sc"),name:g("sn"),pin:g("sp")}))}
+ else if(a==="out")out();
+ else if(a==="tab"){tab=v;view()}
+ else if(a==="dept"){cart.dept=v;vPos()}
+ else if(a==="add"){const m=S.menu.find(x=>x.id===v);if(m){const l=cart.lines[v]||(cart.lines[v]={id:v,n:m.name,p:m.price,q:0,d:m.dept,sku:m.sku||""});l.q++;vPos()}}
+ else if(a==="qty"){const[i,d]=v.split(":"),l=cart.lines[i];if(l){l.q+=+d;if(l.q<1)delete cart.lines[i];vPos()}}
+ else if(a==="clr"){cart={lines:{},ref:"",name:"",phone:"",id:null,bk:null,dept:cart.dept};vPos()}
+ else if(a==="save")await save();
+ else if(a==="pay")await save(v);
+ else if(a==="open"){const o=S.orders.find(x=>x.id===v);if(o){cart={lines:Object.fromEntries(o.lines.map(l=>[l.id,Object.assign({},l)])),ref:o.ref,name:o.name,phone:o.phone,id:o.id,bk:null,dept:cart.dept};tab="pos";view()}}
+ else if(a==="void"){if(confirm("Void this bill and return its stock?")){await api("void",{id:v});toast("Bill voided");sync()}}
+ else if(a==="rc"){const o=S.orders.find(x=>x.id===v);if(o)showRc(o)}
+ else if(a==="bf"){bf=v;vBook()}
+ else if(a==="bk"){const x=S.bookings.find(q=>q.id===v);if(x){cart={lines:{},ref:x.service+" "+x.ref,name:x.name,phone:x.phone,id:null,bk:x.id,dept:"Restaurant"};tab="pos";view()}}
+ else if(a==="per"){per=+v;vRep()}
+ else if(a==="stadd"){if(!g("in"))return toast("Enter an item name");await api("add",{c:"stock",item:{name:g("in"),qty:+g("iq")||0,unit:g("iu")||"unit",min:+g("im")||0}});["in","iq","iu","im"].forEach(i=>$(i).value="");await sync();lInv()}
+ else if(a==="stadj"){const d=+g("d"+v);if(!d)return toast("Enter a number, like 24 or -3");await api("upd",{c:"stock",id:v,patch:{delta:d}});await sync();lInv()}
+ else if(a==="stdel"){if(confirm("Delete this stock item?")){await api("del",{c:"stock",id:v});await sync();lInv()}}
+ else if(a==="mnadd"){const p=+g("mp");if(!g("mn")||!(p>0))return toast("Enter a name and a price");await api("add",{c:"menu",item:{name:g("mn"),price:p,dept:$("md").value,sku:$("ms").value}});["mn","mp"].forEach(i=>$(i).value="");await sync();lMenu()}
+ else if(a==="mndel"){await api("del",{c:"menu",id:v});await sync();lMenu()}
+ else if(a==="stfadd"){await api("add",{c:"staff",item:{name:g("tn"),pin:g("tp"),role:$("tr").value}});["tn","tp"].forEach(i=>$(i).value="");toast("Staff added");await sync();lStaff()}
+ else if(a==="stfdel"){if(confirm("Remove this person?")){await api("del",{c:"staff",id:v});await sync();lStaff()}}
+ }catch(x){(a==="login"||a==="setup")?$("le").textContent=x.message:toast(x.message)}
+});
+if(S.t)api("sync").then(r=>{S.me=r.me;enter({t:S.t,me:r.me})}).catch(()=>{});
+if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script></body></html>

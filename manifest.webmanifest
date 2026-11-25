@@ -1,0 +1,29 @@
+{
+ "name": "DK HBR POS",
+ "short_name": "DK HBR",
+ "description": "Hotel, bar and restaurant POS with online guest booking, inventory and receipts.",
+ "start_url": "./index.html",
+ "scope": "./",
+ "display": "standalone",
+ "orientation": "any",
+ "background_color": "#14181f",
+ "theme_color": "#b08d57",
+ "icons": [
+  {
+   "src": "icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png"
+  },
+  {
+   "src": "icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png"
+  },
+  {
+   "src": "icon-maskable-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "maskable"
+  }
+ ]
+}
