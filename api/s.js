@@ -131,9 +131,18 @@ function cleanSignup(b) {
   if (x.pw.length < 8) throw bad("Password must be at least 8 characters.");
   return x;
 }
-async function createTenant(x, ownerHash) {
+const LIFE = 4102444800000; // "paid forever" marker for one-time packages
+function cleanPkg(b) {
+  const plan = str(b.plan, 40) || "Standard";
+  const fee = b.fee === undefined || b.fee === "" ? 0 : Number(b.fee);
+  if (!isFinite(fee) || fee < 0 || fee > 1e9) throw bad("Enter a valid package fee.");
+  const period = ["month", "year", "once"].includes(b.period) ? b.period : "month";
+  return { plan, fee: Math.round(fee * 100) / 100, period };
+}
+async function createTenant(x, ownerHash, pk) {
   const id = uid(), slug = await makeSlug(x.name);
-  const t = { id, slug, name: x.name, owner: x.owner, email: x.email, phone: x.phone, loc: x.loc, status: "active", ownerHash, ts: now() };
+  const t = { id, slug, name: x.name, owner: x.owner, email: x.email, phone: x.phone, loc: x.loc, status: "active", ownerHash, ts: now(),
+    plan: pk.plan, fee: pk.fee, period: pk.period, paidUntil: 0 };
   await put("p:tenant:" + id, t);
   await put("p:slug:" + slug, id);
   await put(tKey(id, "cfg"), { name: x.name, phone: x.phone, addr: x.loc, tag: DEFAULT_TAG });
@@ -258,9 +267,10 @@ async function pReq(id) {
 async function aPApprove(b) {
   const r = await pReq(b.id);
   if (r.status !== "pending") throw bad("This request was already handled.");
-  const t = await createTenant(r, r.hash);
+  const pk = cleanPkg(b);
+  const t = await createTenant(r, r.hash, pk);
   await put("p:req:" + r.id, Object.assign({}, r, { status: "approved", hash: "", ts2: now() }));
-  return { ok: true, slug: t.slug };
+  return { ok: true, slug: t.slug, id: t.id };
 }
 async function aPReject(b) {
   const r = await pReq(b.id);
@@ -269,16 +279,52 @@ async function aPReject(b) {
   return { ok: true };
 }
 async function aPCreate(b) {
-  const x = cleanSignup(b);
+  const x = cleanSignup(b), pk = cleanPkg(b);
   if (await emailTaken(x.email)) throw bad("That email is already registered.");
-  const t = await createTenant(x, hashPw(x.pw));
-  return { ok: true, slug: t.slug };
+  const t = await createTenant(x, hashPw(x.pw), pk);
+  return { ok: true, slug: t.slug, id: t.id };
 }
 async function aPStatus(b) {
   const t = b.id ? await get("p:tenant:" + str(b.id, 40)) : null;
   if (!t) throw bad("Client not found.");
   if (!["active", "suspended"].includes(b.status)) throw bad("Invalid status.");
   t.status = b.status; await put("p:tenant:" + t.id, t);
+  return { ok: true };
+}
+async function aPPlan(b) {
+  const t = b.id ? await get("p:tenant:" + str(b.id, 40)) : null;
+  if (!t) throw bad("Client not found.");
+  Object.assign(t, cleanPkg(b));
+  if (b.paidUntil !== undefined) {
+    const d = str(b.paidUntil, 10);
+    if (!d) { if (!(t.paidUntil >= LIFE && t.period === "once")) t.paidUntil = 0; }
+    else {
+      const ms = /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(d + "T23:59:59+03:00").getTime() : NaN;
+      if (!isFinite(ms)) throw bad("Check the paid-until date.");
+      t.paidUntil = ms;
+    }
+  }
+  await put("p:tenant:" + t.id, t);
+  return { ok: true };
+}
+async function aPPaid(b) {
+  const t = b.id ? await get("p:tenant:" + str(b.id, 40)) : null;
+  if (!t) throw bad("Client not found.");
+  if (!t.plan) throw bad("Set the package first.");
+  if (t.period === "once") t.paidUntil = LIFE;
+  else {
+    const base = t.paidUntil >= LIFE ? now() : Math.max(now(), t.paidUntil || 0);
+    const d = new Date(base); d.setMonth(d.getMonth() + (t.period === "year" ? 12 : 1));
+    t.paidUntil = d.getTime();
+  }
+  t.lastPaid = now();
+  await put("p:tenant:" + t.id, t);
+  return { ok: true };
+}
+async function aPSettings(b) {
+  const site = str(b.site, 200).replace(/\/+$/, "");
+  if (site && !/^https?:\/\//i.test(site)) throw bad("The site address must start with https://");
+  await put("p:settings", { pay: str(b.pay, 600), contact: str(b.contact, 120), site });
   return { ok: true };
 }
 async function aPReset(b) {
@@ -295,9 +341,10 @@ async function aSync(b, me) {
     const reqs = (await list("p:req:")).filter((r) => r.status === "pending" || r.status === "rejected")
       .map((r) => ({ id: r.id, name: r.name, owner: r.owner, email: r.email, phone: r.phone, loc: r.loc, status: r.status, ts: r.ts }))
       .sort((a, c) => c.ts - a.ts);
-    const tenants = (await allTenants()).map((t) => ({ id: t.id, slug: t.slug, name: t.name, owner: t.owner, email: t.email, phone: t.phone, status: t.status, ts: t.ts }))
+    const tenants = (await allTenants()).map((t) => ({ id: t.id, slug: t.slug, name: t.name, owner: t.owner, email: t.email, phone: t.phone, status: t.status, ts: t.ts,
+      plan: t.plan || "", fee: t.fee || 0, period: t.period || "month", paidUntil: t.paidUntil || 0 }))
       .sort((a, c) => c.ts - a.ts);
-    return { me: { name: me.name, role: "platform" }, reqs, tenants };
+    return { me: { name: me.name, role: "platform" }, reqs, tenants, pset: (await get("p:settings")) || {} };
   }
   const tid = me.tid, sen = SEN.includes(me.role);
   const [c, menu, orders, bookings, stock, staff] = await Promise.all([
@@ -305,8 +352,13 @@ async function aSync(b, me) {
     list(tKey(tid, "bookings") + ":", 300), sen ? list(tKey(tid, "stock") + ":") : [], STF.includes(me.role) ? list(tKey(tid, "staff") + ":") : [],
   ]);
   const byName = (a, z) => String(a.name).localeCompare(String(z.name));
+  let pkg;
+  if (STF.includes(me.role)) {
+    const ps = (await get("p:settings")) || {};
+    pkg = { plan: me.t.plan || "", fee: me.t.fee || 0, period: me.t.period || "month", paidUntil: me.t.paidUntil || 0, pay: ps.pay || "" };
+  }
   return {
-    me: { name: me.name, role: me.role }, slug: me.t.slug,
+    me: { name: me.name, role: me.role }, slug: me.t.slug, pkg,
     cfg: { name: (c && c.name) || me.t.name, phone: (c && c.phone) || "", addr: (c && c.addr) || "", tag: (c && c.tag) || "" },
     menu: menu.sort(byName),
     orders: orders.sort((a, z) => z.ts - a.ts),
@@ -467,7 +519,7 @@ async function aVoid(b, me) {
 
 /* ---------- router ---------- */
 const PUBLIC = { status: aStatus, setup: aSetup, login: aLogin, signup: aSignup, pub: aPub, book: aBook };
-const PLATFORM = { p_approve: aPApprove, p_reject: aPReject, p_create: aPCreate, p_status: aPStatus, p_reset: aPReset };
+const PLATFORM = { p_approve: aPApprove, p_reject: aPReject, p_create: aPCreate, p_status: aPStatus, p_reset: aPReset, p_plan: aPPlan, p_paid: aPPaid, p_settings: aPSettings };
 const HOTEL = { cfg: aCfg, add: aAdd, upd: aUpd, del: aDel, order: aOrder, void: aVoid };
 
 module.exports = async function handler(req, res) {
