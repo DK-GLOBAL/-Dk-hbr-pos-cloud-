@@ -40,44 +40,58 @@ footer{background:var(--ink);color:#c9c4b9;padding:34px 0;font-size:14px}footer 
 @media print{body>*:not(#rcpt){display:none!important}#rcpt{position:static;background:none;display:block!important;padding:0}.paper{width:80mm;padding:0}.noprint{display:none!important}}
 </style></head><body>
 <div id="land">
-<div class="nav"><div class="wrap"><div class="logo" id="lg1"></div><div><a href="#book" class="btn" style="text-decoration:none;display:inline-block">Book now</a></div></div></div>
-<header class="hero"><div class="wrap"><div class="eyebrow" id="ad"></div><h1 id="hn"></h1><div class="rule"></div><p id="tg"></p><p style="margin-top:22px"><a href="#book" class="btn" style="text-decoration:none;display:inline-block">Plan your visit</a> <a href="#services" class="btn o" style="text-decoration:none;display:inline-block">Our services</a></p></div></header>
-<section class="sec" id="services"><div class="wrap"><div class="eyebrow">Stay · Dine · Unwind</div><h2>Everything you need, under one roof</h2><div class="cards" id="cards"></div></div></section>
-<section class="sec" id="book" style="background:#f1ebe0"><div class="wrap"><div class="eyebrow" style="text-align:center">Book online</div><h2 style="text-align:center">Tell us what you need. We’ll have it ready.</h2>
+<div class="nav"><div class="wrap"><div class="logo" id="lg1"></div><div><a href="#book" id="nb" class="btn" style="text-decoration:none;display:inline-block">Book now</a></div></div></div>
+<header class="hero"><div class="wrap"><div class="eyebrow" id="ad"></div><h1 id="hn"></h1><div class="rule"></div><p id="tg"></p><p style="margin-top:22px"><a href="#book" id="hb" class="btn" style="text-decoration:none;display:inline-block">Plan your visit</a> <a href="#services" class="btn o" style="text-decoration:none;display:inline-block">Our services</a></p></div></header>
+<section class="sec" id="services"><div class="wrap"><div class="eyebrow" id="se"></div><h2 id="sh"></h2><div class="cards" id="cards"></div></div></section>
+<section class="sec" id="book" style="background:#f1ebe0"><div class="wrap"><div class="eyebrow" id="be1" style="text-align:center"></div><h2 id="bh" style="text-align:center"></h2>
 <form class="bk" id="bf"><div class="fg"><div><label>Your name</label><input name="name" required autocomplete="name"></div><div><label>Phone (shown on your receipt)</label><input name="phone" required inputmode="tel" placeholder="0712 345 678"></div>
 <div><label>Email (optional)</label><input name="email" type="email"></div><div><label>Service</label><select name="service" id="sv"></select></div>
 <div><label>Date</label><input name="date" type="date" required id="dt"></div><div><label>Time</label><input name="time" type="time" value="12:00"></div><div><label>Guests</label><input name="guests" type="number" min="1" value="2"></div></div>
 <div style="margin-top:12px"><label class="mut">What should we prepare? (room type, meal, treatment, special needs)</label><textarea name="notes" rows="3"></textarea></div>
-<button class="btn" style="margin-top:14px;width:100%">Send booking request</button><div class="err" id="be"></div><div id="bo"></div></form></div></section>
-<footer><div class="wrap" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><b class="serif" id="fn" style="font-size:18px"></b><br><span id="fa"></span></div><div>Powered by DK HBR POS · <button data-a="lgo">Staff login</button></div></div></footer>
+<button class="btn" style="margin-top:14px;width:100%">Send booking request</button><div class="err" id="be"></div><div id="bo"></div></form>
+<form class="bk" id="sg" style="display:none"><div class="fg"><div><label>Hotel or business name</label><input name="name" required></div><div><label>Owner name</label><input name="owner" required autocomplete="name"></div><div><label>Email (you will sign in with it)</label><input name="email" type="email" required autocomplete="email"></div><div><label>Phone</label><input name="phone" required inputmode="tel" placeholder="0712 345 678"></div><div><label>Location</label><input name="loc" placeholder="Town, country"></div><div><label>Password (8+ characters)</label><input name="pw" type="password" required minlength="8" autocomplete="new-password"></div></div>
+<p class="mut" style="margin:12px 0 0">We review each request and approve it. Once approved, sign in with your email and password.</p><button class="btn" style="margin-top:12px;width:100%">Request my account</button><div class="err" id="sge"></div><div id="sgo"></div></form></div></section>
+<footer><div class="wrap" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><b class="serif" id="fn" style="font-size:18px"></b><br><span id="fa"></span></div><div>Powered by DK HBR POS · <button data-a="lgo">Sign in</button></div></div></footer>
 </div>
 
 <div id="app"></div>
-<div class="ov" id="lg"><div class="dlg"><h3>Staff sign in</h3>
-<div id="lf"><input id="ln" placeholder="Your name" autocomplete="username"><input id="lp" type="password" inputmode="numeric" placeholder="PIN" autocomplete="current-password"><button class="go" data-a="login">Sign in</button></div>
-<div id="sf" style="display:none"><p class="mut">First time. Create the owner account with your setup code.</p><input id="sc" placeholder="Setup code"><input id="sn" placeholder="Owner name"><input id="sp" type="password" inputmode="numeric" placeholder="PIN (4 to 8 digits)"><button class="go" data-a="setup">Create owner</button></div>
+<div class="ov" id="lg"><div class="dlg"><h3>Sign in</h3>
+<div class="chips"><button class="chip on" data-a="lm" data-v="staff" id="m1">Hotel staff</button><button class="chip" data-a="lm" data-v="own" id="m2">Owner or admin</button></div>
+<div id="lf"><input id="lh" placeholder="Hotel code"><input id="ln" placeholder="Your name" autocomplete="username"><input id="lp" type="password" inputmode="numeric" placeholder="PIN" autocomplete="current-password"><button class="go" data-a="login">Sign in</button></div>
+<div id="lo" style="display:none"><input id="le1" type="email" placeholder="Email" autocomplete="username"><input id="lw" type="password" placeholder="Password" autocomplete="current-password"><button class="go" data-a="login2">Sign in</button></div>
+<div id="sf" style="display:none"><p class="mut">First time. Create the platform admin account with your setup code.</p><input id="sc" placeholder="Setup code"><input id="sn" placeholder="Your name"><input id="se1" type="email" placeholder="Admin email"><input id="sw" type="password" placeholder="Password (8+ characters)"><button class="go" data-a="setup">Create platform admin</button></div>
 <div class="err" id="le"></div><button class="sm" data-a="lgx" style="margin-top:6px">Close</button></div></div>
 <div id="rcpt"></div><div id="toast" role="status"></div>
 <script>
-const HOTEL={name:"DK Grand Hotel",tag:"Rest well. Dine well. Be well. Book your stay, table or treatment online and we’ll have everything ready when you arrive.",phone:"+254 700 000 000",addr:"Nakuru, Kenya"};
+const QH=new URLSearchParams(location.search).get("h")||"";const HOTEL={name:QH?"":"DK HBR POS",tag:QH?"":"The hotel, bar and restaurant system. Online booking, POS, inventory and printable receipts for every outlet.",phone:"",addr:QH?"":"By DK Global Tech"};
 const SV=[["Rooms and suites","Comfortable rooms, made up and ready for your arrival."],["Restaurant table","Reserve a table and tell us what to prepare."],["Bar and lounge","Evening drinks and a corner kept just for you."],["Spa and wellness","Massage and treatments, booked to your time."],["Events and conferences","Meetings, weddings and celebrations, set up in advance."],["Airport or town transfer","A driver waiting with your name on it."]];
+const FT=[["Online guest booking","Guests book rooms, tables and treatments online, with their phone number saved."],["Bar, restaurant and spa POS","Fast bills with M-Pesa, card, cash and room charge."],["Inventory that updates itself","Every sale deducts stock, with low-stock alerts for seniors."],["Roles and staff PINs","Owner, manager, supervisor, cashier and waiter."],["Printable receipts","The guest’s phone number prints on every receipt."],["Your own booking page","Each hotel gets its own link to share with guests."]];
 const $=id=>document.getElementById(id),esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const money=n=>"KSh "+Math.round(n).toLocaleString(),SEN=["owner","manager","supervisor"],ld=d=>new Date(d).toLocaleDateString([],{weekday:"short",day:"numeric",month:"short"});
 const lymd=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
 let S={t:sessionStorage.getItem("dkt")||"",me:null,menu:[],orders:[],bookings:[],stock:[],staff:[]},tab="pos",per=1,bf="up",cart={lines:{},ref:"",name:"",phone:"",id:null,bk:null,dept:"Restaurant"},poll;
-document.title=HOTEL.name;$("lg1").innerHTML=esc(HOTEL.name).replace(/^(\S+)/,"<b>$1</b>");$("hn").textContent=HOTEL.name;$("tg").textContent=HOTEL.tag;$("ad").textContent=HOTEL.addr;$("fn").textContent=HOTEL.name;$("fa").textContent=HOTEL.addr+" · "+HOTEL.phone;
-$("cards").innerHTML=SV.map((s,i)=>`<div class="sv"><i>✦</i><h3>${s[0]}</h3><p class="mut" style="font-size:14px">${s[1]}</p><button class="btn o" data-a="pick" data-v="${i}">Book this</button></div>`).join("");
-$("sv").innerHTML=SV.map(s=>`<option>${s[0]}</option>`).join("");$("dt").min=lymd(new Date());$("dt").value=lymd(new Date(Date.now()+864e5));
+function paintLand(){
+ const P=!QH;document.title=HOTEL.name||"DK HBR POS";
+ $("lg1").innerHTML=esc(HOTEL.name).replace(/^(\S+)/,"<b>$1</b>");$("hn").textContent=HOTEL.name;$("tg").textContent=HOTEL.tag;$("ad").textContent=HOTEL.addr;$("fn").textContent=HOTEL.name;$("fa").textContent=[HOTEL.addr,HOTEL.phone].filter(Boolean).join(" · ");
+ $("cards").innerHTML=(P?FT:SV).map((x,i)=>`<div class="sv"><i>✦</i><h3>${x[0]}</h3><p class="mut" style="font-size:14px">${x[1]}</p>${P?"":`<button class="btn o" data-a="pick" data-v="${i}">Book this</button>`}</div>`).join("");
+ $("se").textContent=P?"Built for hotels, bars and restaurants":"Stay · Dine · Unwind";$("sh").textContent=P?"Run every outlet from one screen":"Everything you need, under one roof";
+ $("nb").textContent=P?"Request account":"Book now";$("hb").textContent=P?"Request your account":"Plan your visit";
+ $("be1").textContent=P?"Get started":"Book online";$("bh").textContent=P?"Create your hotel account":"Tell us what you need. We’ll have it ready.";
+ $("bf").style.display=P?"none":"";$("sg").style.display=P?"":"none";$("lh").value=QH}
+$("sv").innerHTML=SV.map(x=>`<option>${x[0]}</option>`).join("");$("dt").min=lymd(new Date());$("dt").value=lymd(new Date(Date.now()+864e5));paintLand();
+if(QH)api("pub",{h:QH}).then(r=>{Object.assign(HOTEL,r);paintLand()}).catch(x=>{HOTEL.name="Hotel not found";HOTEL.tag=x.message;paintLand()});
 function toast(m){const t=$("toast");t.textContent=m;t.style.display="block";clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display="none",3000)}
-async function api(a,d){const r=await fetch("/api/s",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.assign({a,t:S.t},d||{}))});const j=await r.json().catch(()=>({err:"Network problem"}));if(!r.ok){if(r.status===401&&S.me)out();throw new Error(j.err||"Something went wrong")}return j}
-$("bf").onsubmit=async e=>{e.preventDefault();$("be").textContent="";try{const f=Object.fromEntries(new FormData(e.target)),r=await api("book",f);$("bo").innerHTML=`<div class="ok"><b>Request received. Reference ${esc(r.ref)}.</b><br>We’ll call or WhatsApp you on ${esc(f.phone)} to confirm. This number will appear on your receipt.</div>`;e.target.reset();$("dt").value=lymd(new Date(Date.now()+864e5))}catch(x){$("be").textContent=x.message}};
+async function api(a,d){const r=await fetch("/api/s",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.assign({a,t:S.t},d||{}))});const j=await r.json().catch(()=>({err:"Network problem"}));if(!r.ok){if((r.status===401||r.status===403)&&S.me){out();toast(j.err)}throw new Error(j.err||"Something went wrong")}return j}
+$("bf").onsubmit=async e=>{e.preventDefault();$("be").textContent="";try{const f=Object.fromEntries(new FormData(e.target)),r=await api("book",Object.assign({h:QH},f));$("bo").innerHTML=`<div class="ok"><b>Request received. Reference ${esc(r.ref)}.</b><br>We’ll call or WhatsApp you on ${esc(f.phone)} to confirm. This number will appear on your receipt.</div>`;e.target.reset();$("dt").value=lymd(new Date(Date.now()+864e5))}catch(x){$("be").textContent=x.message}};
+$("sg").onsubmit=async e=>{e.preventDefault();$("sge").textContent="";try{await api("signup",Object.fromEntries(new FormData(e.target)));$("sgo").innerHTML='<div class="ok"><b>Request received.</b><br>We’ll review it and approve your account. Then sign in with your email and password.</div>';e.target.reset()}catch(x){$("sge").textContent=x.message}};
 const can={pay:()=>S.me.role!=="waiter",sen:()=>SEN.includes(S.me.role),stf:()=>["owner","manager"].includes(S.me.role)};
-const TABS=()=>[["pos","New bill"],["bills","Bills"],["bookings","Bookings"],...(can.sen()?[["inventory","Inventory"],["menu","Menu"],["reports","Reports"]]:[]),...(can.stf()?[["staff","Staff"]]:[])];
-function enter(r){S.t=r.t;sessionStorage.setItem("dkt",r.t);S.me=r.me;$("lg").style.display="none";$("land").style.display="none";$("app").style.display="block";shell();sync();clearInterval(poll);poll=setInterval(()=>{if(!document.hidden)sync()},12000)}
+const pend=()=>(S.reqs||[]).filter(x=>x.status==="pending");
+const TABS=()=>S.me.role==="platform"?[["req","Requests"+(pend().length?" ("+pend().length+")":"")],["cl","Clients"],["nc","Create client"]]:[["pos","New bill"],["bills","Bills"],["bookings","Bookings"],...(can.sen()?[["inventory","Inventory"],["menu","Menu"],["reports","Reports"]]:[]),...(can.stf()?[["staff","Staff"],["set","Settings"]]:[])];
+function enter(r){S.t=r.t;sessionStorage.setItem("dkt",r.t);S.me=r.me;tab=r.me.role==="platform"?"req":"pos";$("lg").style.display="none";$("land").style.display="none";$("app").style.display="block";shell();sync();clearInterval(poll);poll=setInterval(()=>{if(!document.hidden)sync()},12000)}
 function out(){clearInterval(poll);sessionStorage.removeItem("dkt");S.t="";S.me=null;$("app").style.display="none";$("land").style.display="block"}
-async function sync(){try{Object.assign(S,await api("sync"));if(!$("v"))return;if(tab==="menu"||tab==="inventory"||tab==="staff"){const l=$("ls");if(l)({menu:lMenu,inventory:lInv,staff:lStaff})[tab]()}else if(tab!=="pos")view()}catch(e){}}
+async function sync(){try{Object.assign(S,await api("sync"));if(S.cfg)Object.assign(HOTEL,S.cfg);if(!$("v"))return;const rb=document.querySelector("#app [data-v=req]");if(rb)rb.textContent="Requests"+(pend().length?" ("+pend().length+")":"");if(tab==="menu"||tab==="inventory"||tab==="staff"){const l=$("ls");if(l)({menu:lMenu,inventory:lInv,staff:lStaff})[tab]()}else if(!["pos","nc","set"].includes(tab))view()}catch(e){}}
 function shell(){$("app").innerHTML=`<div class="top"><div class="logo" style="font-size:20px">${esc(HOTEL.name)}<div class="mut" style="font-family:Inter">DK HBR POS</div></div><div><span class="chip">${esc(S.me.name)} · ${esc(S.me.role)}</span> <button class="sm" data-a="out">Sign out</button></div></div><div class="chips">${TABS().map(t=>`<button class="chip" data-a="tab" data-v="${t[0]}">${t[1]}</button>`).join("")}</div><div id="v"></div>`;view()}
-function view(){document.querySelectorAll("#app .chips [data-a=tab]").forEach(b=>b.classList.toggle("on",b.dataset.v===tab));({pos:vPos,bills:vBills,bookings:vBook,inventory:vInv,menu:vMenu,reports:vRep,staff:vStaff})[tab]()}
+function view(){document.querySelectorAll("#app .chips [data-a=tab]").forEach(b=>b.classList.toggle("on",b.dataset.v===tab));({pos:vPos,bills:vBills,bookings:vBook,inventory:vInv,menu:vMenu,reports:vRep,staff:vStaff,set:vSet,req:vReq,cl:vCl,nc:vNc})[tab]()}
 const ctot=()=>Object.values(cart.lines).reduce((a,l)=>a+l.p*l.q,0);
 function vPos(){
  const it=S.menu.filter(m=>m.dept===cart.dept),L=Object.values(cart.lines),t=ctot();
@@ -107,6 +121,11 @@ function vMenu(){$("v").innerHTML=`<div class="card"><b>Add menu item</b><div cl
 function lMenu(){$("ls").innerHTML=S.menu.map(m=>`<div class="card row"><span>${esc(m.name)} <span class="mut">${esc(m.dept)}${m.sku?" · tracked":""}</span></span><span>${money(m.price)} <button class="sm bad" data-a="mndel" data-v="${m.id}">Delete</button></span></div>`).join("")||'<p class="mut">No items yet.</p>'}
 function vStaff(){$("v").innerHTML=`<div class="card"><b>Add staff</b><p class="mut">Waiters take orders. Cashiers also take payment. Supervisors and managers manage inventory, menu, voids and reports. Only managers and the owner manage staff.</p><div class="fg"><input id="tn" placeholder="Name"><input id="tp" placeholder="PIN (4 to 8 digits)" inputmode="numeric"><select id="tr"><option>waiter</option><option>cashier</option><option>supervisor</option><option>manager</option>${S.me.role==="owner"?"<option>owner</option>":""}</select><button class="go" style="margin:0" data-a="stfadd">Add</button></div></div><div id="ls"></div>`;lStaff()}
 function lStaff(){$("ls").innerHTML=(S.staff||[]).map(s=>`<div class="card row"><span>${esc(s.name)} <span class="mut">${esc(s.role)}</span></span>${s.name===S.me.name?'<span class="mut">You</span>':`<button class="sm bad" data-a="stfdel" data-v="${s.id}">Remove</button>`}</div>`).join("")}
+function vReq(){$("v").innerHTML=pend().map(x=>`<div class="card"><div class="row"><b>${esc(x.name)}</b><span class="mut">${new Date(x.ts).toLocaleDateString()}</span></div><div>${esc(x.owner)} · ${esc(x.email)} · <b>${esc(x.phone)}</b></div><div class="mut">${esc(x.loc||"")}</div><div class="row"><span></span><span><button class="sm" data-a="app" data-v="${x.id}">Approve</button> <button class="sm bad" data-a="rej" data-v="${x.id}">Reject</button></span></div></div>`).join("")||'<p class="mut">No pending requests.</p>'}
+function vCl(){$("v").innerHTML=(S.tenants||[]).map(t=>`<div class="card"><div class="row"><b>${esc(t.name)}</b>${t.status==="active"?'<span class="mut">active</span>':'<span class="low">suspended</span>'}</div><div class="mut">${esc(t.owner)} · ${esc(t.email)} · ${esc(t.phone)}</div><div class="mut">Hotel code: <b>${esc(t.slug)}</b> · Guest page: ${esc(location.origin+"/?h="+t.slug)}</div><div class="row"><span></span><span><button class="sm" data-a="tst" data-v="${t.id}">${t.status==="active"?"Suspend":"Activate"}</button> <button class="sm" data-a="trs" data-v="${t.id}">Reset password</button></span></div></div>`).join("")||'<p class="mut">No clients yet.</p>'}
+function vNc(){$("v").innerHTML=`<div class="card"><b>Create a client account</b><div class="fg" style="margin-top:8px"><input id="cn" placeholder="Hotel or business name"><input id="co" placeholder="Owner name"><input id="ce" type="email" placeholder="Owner email"><input id="cp" placeholder="Phone" inputmode="tel"><input id="cl1" placeholder="Location"><input id="cw" placeholder="Temporary password (8+)"><button class="go" style="margin:0" data-a="ncr">Create and activate</button></div><p class="mut">The client signs in with this email and password under "Owner or admin", then adds staff, stock and menu.</p></div>`}
+function vSet(){const c=S.cfg||{};$("v").innerHTML=`<div class="card"><b>Hotel details</b><p class="mut">Shown on your guest page and on every receipt.</p><div class="fg"><input id="hn1" placeholder="Hotel name" value="${esc(c.name)}"><input id="hp" placeholder="Phone" value="${esc(c.phone)}"><input id="ha" placeholder="Address" value="${esc(c.addr)}"><input id="ht" placeholder="Welcome message" value="${esc(c.tag)}"><button class="go" style="margin:0" data-a="cfg">Save</button></div></div><div class="card"><b>Share with guests</b><p>Booking page: <b>${esc(location.origin+"/?h="+(S.slug||""))}</b></p><p class="mut">Hotel code for staff sign-in: <b>${esc(S.slug||"")}</b></p></div>`}
+function lmode(m){[["lf","staff"],["lo","own"],["sf","setup"]].forEach(([x,k])=>$(x).style.display=k===m?"block":"none");$("m1").classList.toggle("on",m==="staff");$("m2").classList.toggle("on",m==="own");$("m1").parentNode.style.display=m==="setup"?"none":"flex"}
 function vRep(){
  const st=per===0?0:new Date().setHours(0,0,0,0)-(per-1)*864e5,p=S.orders.filter(o=>o.status==="paid"&&o.paidTs>=st),s=p.reduce((a,o)=>a+o.total,0);
  const g=f=>{const m={};p.forEach(o=>f(o).forEach(([k,v])=>m[k]=(m[k]||0)+v));return Object.entries(m).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div class="row"><span>${esc(k)}</span><b>${money(v)}</b></div>`).join("")||'<p class="mut">No sales yet.</p>'};
@@ -123,10 +142,18 @@ document.addEventListener("click",async e=>{
  const b=e.target.closest("[data-a]");if(!b||b.tagName==="SELECT")return;const a=b.dataset.a,v=b.dataset.v,g=i=>$(i).value.trim();
  try{
  if(a==="pick"){$("sv").selectedIndex=+v;$("book").scrollIntoView({behavior:"smooth"})}
- else if(a==="lgo"){$("lg").style.display="flex";$("le").textContent="";const r=await api("status");$("lf").style.display=r.setup?"none":"block";$("sf").style.display=r.setup?"block":"none"}
+ else if(a==="lgo"){$("lg").style.display="flex";$("le").textContent="";const r=await api("status");lmode(r.setup?"setup":QH?"staff":"own")}
+ else if(a==="lm")lmode(v);
  else if(a==="lgx")$("lg").style.display="none";
- else if(a==="login"){enter(await api("login",{name:g("ln"),pin:g("lp")}));$("lp").value=""}
- else if(a==="setup"){enter(await api("setup",{code:g("sc"),name:g("sn"),pin:g("sp")}))}
+ else if(a==="login"){enter(await api("login",{h:g("lh"),name:g("ln"),pin:g("lp")}));$("lp").value=""}
+ else if(a==="login2"){enter(await api("login",{email:g("le1"),pw:$("lw").value}));$("lw").value=""}
+ else if(a==="setup"){enter(await api("setup",{code:g("sc"),name:g("sn"),email:g("se1"),pw:$("sw").value}))}
+ else if(a==="app"){await api("p_approve",{id:v});toast("Client approved");await sync()}
+ else if(a==="rej"){if(confirm("Reject this request?")){await api("p_reject",{id:v});await sync()}}
+ else if(a==="tst"){const t=S.tenants.find(x=>x.id===v);await api("p_status",{id:v,status:t.status==="active"?"suspended":"active"});await sync()}
+ else if(a==="trs"){const pw=prompt("New temporary password for the owner (8+ characters)");if(pw){await api("p_reset",{id:v,pw});toast("Password reset")}}
+ else if(a==="ncr"){const r=await api("p_create",{name:g("cn"),owner:g("co"),email:g("ce"),phone:g("cp"),loc:g("cl1"),pw:g("cw")});toast("Created. Hotel code: "+r.slug);await sync();tab="cl";view()}
+ else if(a==="cfg"){await api("cfg",{name:g("hn1"),phone:g("hp"),addr:g("ha"),tag:g("ht")});toast("Saved");await sync()}
  else if(a==="out")out();
  else if(a==="tab"){tab=v;view()}
  else if(a==="dept"){cart.dept=v;vPos()}
@@ -148,7 +175,7 @@ document.addEventListener("click",async e=>{
  else if(a==="mndel"){await api("del",{c:"menu",id:v});await sync();lMenu()}
  else if(a==="stfadd"){await api("add",{c:"staff",item:{name:g("tn"),pin:g("tp"),role:$("tr").value}});["tn","tp"].forEach(i=>$(i).value="");toast("Staff added");await sync();lStaff()}
  else if(a==="stfdel"){if(confirm("Remove this person?")){await api("del",{c:"staff",id:v});await sync();lStaff()}}
- }catch(x){(a==="login"||a==="setup")?$("le").textContent=x.message:toast(x.message)}
+ }catch(x){(a==="login"||a==="login2"||a==="setup")?$("le").textContent=x.message:toast(x.message)}
 });
 if(S.t)api("sync").then(r=>{S.me=r.me;enter({t:S.t,me:r.me})}).catch(()=>{});
 if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
