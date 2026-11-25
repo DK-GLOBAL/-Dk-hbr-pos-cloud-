@@ -93,8 +93,10 @@ const lockClear = (key) => del("rl:" + key).catch(() => {});
 
 /* ---------- constants ---------- */
 const ROLES = ["waiter", "reception", "cashier", "supervisor", "manager", "director", "owner"];
-const SEN = ["owner", "director", "manager", "supervisor"];
-const STF = ["owner", "director", "manager"];
+const SEN = ["owner", "director", "manager", "supervisor"];   // stock, menu, voids, reports
+const STF = ["owner", "director", "manager"];                  // staff, settings, audit trail
+const TOP = ["owner", "director"];                              // may create/remove managers and directors
+const rank = (r) => ROLES.indexOf(r);
 const DEPTS = ["Restaurant", "Bar", "Spa", "Hotel"];
 const PAYS = ["Cash", "M-Pesa", "Card", "Room"];
 const BSTAT = ["Requested", "Confirmed", "Arrived", "Done", "Cancelled"];
@@ -117,7 +119,6 @@ async function emailTaken(email) {
   const admin = await get("p:admin");
   if (admin && admin.email === email) return true;
   if ((await allTenants()).some((t) => t.email === email)) return true;
-  if (await get("p:se:" + email)) return true;
   if ((await list("p:req:")).some((r) => r.status === "pending" && r.email === email)) return true;
   return false;
 }
@@ -167,6 +168,12 @@ async function session(b) {
   if (!s) throw E(401, "Your access was removed.");
   return { role: s.role, name: s.name, tid: t.id, sid: s.id, t };
 }
+async function audit(me, act, detail) {
+  try {
+    const id = String(now()).padStart(14, "0") + "-" + uid();
+    await put(tKey(me.tid, "audit", id), { id, ts: now(), who: me.name, role: me.role, act, d: str(detail, 300) });
+  } catch (e) { console.error("audit", e); }
+}
 const need = (me, roles) => { if (!roles.includes(me.role)) throw bad("Your role cannot do this."); };
 
 /* ---------- actions: public ---------- */
@@ -187,42 +194,41 @@ async function aSetup(b, ip) {
 }
 
 async function aLogin(b, ip) {
-  const email = lc(b.email), pw = String(b.pw || ""), lk = "em:" + sha(email + ip);
-  await lockCheck(lk, 8, 15 * 60e3);
-  const fail = async () => { await lockHit(lk, 15 * 60e3); throw E(401, "Wrong email or password."); };
-  if (!email || !pw) throw bad("Enter your email and password.");
-  // 1. platform admin
-  const admin = await get("p:admin");
-  if (admin && admin.email === email) {
-    if (!checkPw(pw, admin.hash)) return fail();
-    await lockClear(lk);
-    return { t: sign({ r: "platform", e: email }), me: { name: admin.name, role: "platform" } };
-  }
-  // 2. hotel owner
-  const t = (await allTenants()).find((x) => x.email === email);
-  if (t) {
-    if (!checkPw(pw, t.ownerHash)) return fail();
-    if (t.status !== "active") throw E(401, "This account is suspended. Contact DK Global Tech.");
-    await lockClear(lk);
-    return { t: sign({ r: "owner", tid: t.id }), me: { name: t.owner, role: "owner" } };
-  }
-  // 3. hotel staff (director, manager, reception, cashier, waiter ...)
-  const ix = await get("p:se:" + email);
-  if (ix) {
-    const st = await get("p:tenant:" + ix.tid);
-    const staff = st ? await get(tKey(st.id, "staff", ix.sid)) : null;
-    if (st && staff && staff.pwHash && checkPw(pw, staff.pwHash)) {
-      if (st.status !== "active") throw E(401, "This account is suspended. Contact the hotel owner.");
+  if (b.email !== undefined) {
+    const email = lc(b.email), pw = String(b.pw || ""), lk = "em:" + sha(email + ip);
+    await lockCheck(lk, 8, 15 * 60e3);
+    const fail = async () => { await lockHit(lk, 15 * 60e3); throw E(401, "Wrong email or password."); };
+    if (!email || !pw) throw bad("Enter your email and password.");
+    const admin = await get("p:admin");
+    if (admin && admin.email === email) {
+      if (!checkPw(pw, admin.hash)) return fail();
       await lockClear(lk);
-      return { t: sign({ r: "staff", tid: st.id, sid: staff.id }), me: { name: staff.name, role: staff.role } };
+      return { t: sign({ r: "platform", e: email }), me: { name: admin.name, role: "platform" } };
     }
+    const t = (await allTenants()).find((x) => x.email === email);
+    if (t) {
+      if (!checkPw(pw, t.ownerHash)) return fail();
+      if (t.status !== "active") throw E(401, "This account is suspended. Contact DK Global Tech.");
+      await lockClear(lk);
+      await audit({ tid: t.id, name: t.owner, role: "owner" }, "Sign in", "Owner sign in");
+      return { t: sign({ r: "owner", tid: t.id }), me: { name: t.owner, role: "owner" } };
+    }
+    const rq = (await list("p:req:")).find((x) => x.email === email && x.status !== "approved");
+    if (rq && checkPw(pw, rq.hash))
+      throw E(401, rq.status === "pending" ? "Your request is still being reviewed. We will approve it soon." : "This request was not approved. Contact DK Global Tech.");
     return fail();
   }
-  // 4. pending or rejected request
-  const rq = (await list("p:req:")).find((x) => x.email === email && x.status !== "approved");
-  if (rq && checkPw(pw, rq.hash))
-    throw E(401, rq.status === "pending" ? "Your request is still being reviewed. We will approve it soon." : "This request was not approved. Contact DK Global Tech.");
-  return fail();
+  const slug = lc(b.h), name = lc(b.name), pin = String(b.pin || "");
+  if (!slug || !name || !pin) throw bad("Enter the hotel code, your name and your PIN.");
+  const lk = "st:" + sha(slug + name + ip);
+  await lockCheck(lk, 8, 15 * 60e3);
+  const t = await tenantBySlug(slug);
+  const staff = t ? (await list(tKey(t.id, "staff") + ":")).find((s) => lc(s.name) === name) : null;
+  if (!t || !staff || !checkPw(pin, staff.pinHash)) { await lockHit(lk, 15 * 60e3); throw E(401, "Wrong hotel code, name or PIN."); }
+  if (t.status !== "active") throw E(401, "This account is suspended. Contact the hotel owner.");
+  await lockClear(lk);
+  await audit({ tid: t.id, name: staff.name, role: staff.role }, "Sign in", "Staff sign in");
+  return { t: sign({ r: "staff", tid: t.id, sid: staff.id }), me: { name: staff.name, role: staff.role } };
 }
 
 async function aSignup(b, ip) {
@@ -340,15 +346,6 @@ async function aPReset(b) {
 }
 
 /* ---------- actions: hotel ---------- */
-async function aStfReset(b, me) {
-  need(me, STF);
-  const s = await get(tKey(me.tid, "staff", str(b.id, 40)));
-  if (!s) throw bad("Staff member not found.");
-  if (String(b.pw || "").length < 8) throw bad("Password must be at least 8 characters.");
-  if (["owner", "director", "manager"].includes(s.role) && !["owner", "director"].includes(me.role) && s.id !== me.sid) throw bad("Only the owner or a director can reset this password.");
-  s.pwHash = hashPw(b.pw); await put(tKey(me.tid, "staff", s.id), s);
-  return { ok: true };
-}
 async function aSync(b, me) {
   if (me.role === "platform") {
     const reqs = (await list("p:req:")).filter((r) => r.status === "pending" || r.status === "rejected")
@@ -360,9 +357,10 @@ async function aSync(b, me) {
     return { me: { name: me.name, role: "platform" }, reqs, tenants, pset: (await get("p:settings")) || {} };
   }
   const tid = me.tid, sen = SEN.includes(me.role);
-  const [c, menu, orders, bookings, stock, staff] = await Promise.all([
+  const [c, menu, orders, bookings, stock, staff, aud] = await Promise.all([
     get(tKey(tid, "cfg")), list(tKey(tid, "menu") + ":"), list(tKey(tid, "orders") + ":", 300),
     list(tKey(tid, "bookings") + ":", 300), sen ? list(tKey(tid, "stock") + ":") : [], STF.includes(me.role) ? list(tKey(tid, "staff") + ":") : [],
+    STF.includes(me.role) ? list(tKey(tid, "audit") + ":", 250) : [],
   ]);
   const byName = (a, z) => String(a.name).localeCompare(String(z.name));
   let pkg;
@@ -377,7 +375,9 @@ async function aSync(b, me) {
     orders: orders.sort((a, z) => z.ts - a.ts),
     bookings,
     stock: stock.sort(byName),
-    staff: staff.map((s) => ({ id: s.id, name: s.name, role: s.role, email: s.email || "" })).sort(byName),
+    audit: aud.sort((a, z) => z.ts - a.ts),
+    at: now(),
+    staff: staff.map((s) => ({ id: s.id, name: s.name, role: s.role })).sort(byName),
   };
 }
 
@@ -386,6 +386,7 @@ async function aCfg(b, me) {
   const name = str(b.name, 80);
   if (!name) throw bad("Enter the hotel name.");
   await put(tKey(me.tid, "cfg"), { name, phone: str(b.phone, 30), addr: str(b.addr, 120), tag: str(b.tag, 200) });
+  await audit(me, "Settings", "Hotel details changed");
   return { ok: true };
 }
 
@@ -395,7 +396,8 @@ async function aAdd(b, me) {
     need(me, SEN);
     const name = str(it.name, 80); if (!name) throw bad("Enter an item name.");
     const o = { id: uid(), name, qty: +it.qty || 0, unit: str(it.unit, 20) || "unit", min: +it.min || 0 };
-    await put(tKey(me.tid, "stock", o.id), o); return { ok: true, id: o.id };
+    await put(tKey(me.tid, "stock", o.id), o);
+    await audit(me, "Stock added", `${o.name}: ${o.qty} ${o.unit}`); return { ok: true, id: o.id };
   }
   if (c === "menu") {
     need(me, SEN);
@@ -405,22 +407,21 @@ async function aAdd(b, me) {
     let sku = str(it.sku, 40);
     if (sku && !(await get(tKey(me.tid, "stock", sku)))) sku = "";
     const o = { id: uid(), name, price, dept: it.dept, sku };
-    await put(tKey(me.tid, "menu", o.id), o); return { ok: true, id: o.id };
+    await put(tKey(me.tid, "menu", o.id), o);
+    await audit(me, "Menu added", `${o.name} KSh ${o.price}`); return { ok: true, id: o.id };
   }
   if (c === "staff") {
     need(me, STF);
-    const name = str(it.name, 60), email = lc(it.email), pw = String(it.pw || ""), role = it.role;
+    const name = str(it.name, 60), pin = String(it.pin || "").trim(), role = it.role;
     if (!name) throw bad("Enter the staff name.");
-    if (!emailOk(email)) throw bad("Enter the staff member's email address.");
-    if (pw.length < 8) throw bad("Password must be at least 8 characters.");
+    if (!/^\d{4,8}$/.test(pin)) throw bad("PIN must be 4 to 8 digits.");
     if (!ROLES.includes(role)) throw bad("Choose a role.");
     if (role === "owner" && me.role !== "owner") throw bad("Only the owner can add another owner.");
-    if (["director", "manager"].includes(role) && !["owner", "director"].includes(me.role)) throw bad("Only the owner or a director can add a manager or director.");
-    if (await emailTaken(email)) throw bad("That email is already used on the system.");
-    const o = { id: uid(), name, email, role, pwHash: hashPw(pw), ts: now() };
+    if (rank(role) >= rank("manager") && !TOP.includes(me.role)) throw bad("Only the owner or a director can add a manager or director.");
+    if ((await list(tKey(me.tid, "staff") + ":")).some((s) => lc(s.name) === lc(name))) throw bad("Someone with that name already exists.");
+    const o = { id: uid(), name, role, pinHash: hashPw(pin) };
     await put(tKey(me.tid, "staff", o.id), o);
-    await put("p:se:" + email, { tid: me.tid, sid: o.id });
-    return { ok: true, id: o.id };
+    await audit(me, "Staff added", `${o.name} (${o.role})`); return { ok: true, id: o.id };
   }
   throw bad("Unknown item type.");
 }
@@ -430,20 +431,37 @@ async function aUpd(b, me) {
   if (c === "bookings") {
     const o = await get(tKey(me.tid, "bookings", id)); if (!o) throw bad("Booking not found.");
     if (!BSTAT.includes(patch.status)) throw bad("Invalid status.");
-    o.status = patch.status; await put(tKey(me.tid, "bookings", id), o); return { ok: true };
+    o.status = patch.status; await put(tKey(me.tid, "bookings", id), o);
+    await audit(me, "Booking", `${o.ref} to ${o.status}`); return { ok: true };
+  }
+  if (c === "staff") {
+    need(me, STF);
+    const s = await get(tKey(me.tid, "staff", id)); if (!s) throw bad("Staff member not found.");
+    if (rank(s.role) >= rank("manager") && !TOP.includes(me.role)) throw bad("Only the owner or a director can change a manager.");
+    if (patch.pin !== undefined) {
+      if (!/^\d{4,8}$/.test(String(patch.pin))) throw bad("PIN must be 4 to 8 digits.");
+      s.pinHash = hashPw(String(patch.pin)); await audit(me, "PIN reset", s.name);
+    }
+    if (patch.role !== undefined) {
+      if (!ROLES.includes(patch.role) || patch.role === "owner") throw bad("Choose a role.");
+      if (rank(patch.role) >= rank("manager") && !TOP.includes(me.role)) throw bad("Only the owner or a director can make a manager.");
+      await audit(me, "Role changed", `${s.name}: ${s.role} to ${patch.role}`); s.role = patch.role;
+    }
+    await put(tKey(me.tid, "staff", id), s); return { ok: true };
   }
   need(me, SEN);
   if (c === "stock") {
     const o = await get(tKey(me.tid, "stock", id)); if (!o) throw bad("Stock item not found.");
     const d = +patch.delta; if (!d || !isFinite(d)) throw bad("Enter a number, like 24 or -3.");
-    o.qty = Math.round((o.qty + d) * 1000) / 1000; await put(tKey(me.tid, "stock", id), o); return { ok: true };
+    const before = o.qty; o.qty = Math.round((o.qty + d) * 1000) / 1000; await put(tKey(me.tid, "stock", id), o);
+    await audit(me, d > 0 ? "Stock in" : "Stock out", `${o.name}: ${d > 0 ? "+" : ""}${d} (${before} to ${o.qty} ${o.unit})${patch.why ? " - " + str(patch.why, 80) : ""}`); return { ok: true };
   }
   if (c === "menu") {
     const o = await get(tKey(me.tid, "menu", id)); if (!o) throw bad("Menu item not found.");
     if (patch.name !== undefined) o.name = str(patch.name, 80) || o.name;
     if (patch.price !== undefined && +patch.price > 0) o.price = +patch.price;
     if (patch.dept !== undefined && DEPTS.includes(patch.dept)) o.dept = patch.dept;
-    await put(tKey(me.tid, "menu", id), o); return { ok: true };
+    await put(tKey(me.tid, "menu", id), o); await audit(me, "Menu edited", `${o.name} KSh ${o.price}`); return { ok: true };
   }
   throw bad("Unknown item type.");
 }
@@ -456,10 +474,11 @@ async function aDel(b, me) {
     if (id === me.sid) throw bad("You cannot remove yourself.");
     const s = await get(tKey(me.tid, "staff", id));
     if (s && s.role === "owner" && me.role !== "owner") throw bad("Only the owner can remove an owner.");
-    if (s && ["director", "manager"].includes(s.role) && !["owner", "director"].includes(me.role)) throw bad("Only the owner or a director can remove a manager or director.");
-    if (s && s.email) await del("p:se:" + s.email).catch(() => {});
+    if (s && rank(s.role) >= rank("manager") && !TOP.includes(me.role)) throw bad("Only the owner or a director can remove a manager.");
   }
+  const gone = await get(tKey(me.tid, c, id));
   await del(tKey(me.tid, c, id));
+  await audit(me, c === "staff" ? "Staff removed" : c === "menu" ? "Menu deleted" : "Stock deleted", gone ? gone.name : id);
   return { ok: true };
 }
 
@@ -489,6 +508,8 @@ async function aOrder(b, me) {
   if (pay && digits(phone).length < 9) throw bad("Enter the guest's phone number. It prints on the receipt.");
   if (pay === "Room" && !ref) throw bad("Enter the room number first.");
 
+  const cid = /^[a-z0-9]{8,24}$/i.test(String(b.cid || "")) ? String(b.cid) : "";
+  if (cid && !b.id) { const dup = await get(tKey(tid, "orders", cid)); if (dup) return { o: dup, dup: true }; }
   let old = null;
   if (b.id) {
     old = await get(tKey(tid, "orders", str(b.id, 40)));
@@ -517,11 +538,13 @@ async function aOrder(b, me) {
   if (old) o = old;
   else {
     const seq = ((await get(tKey(tid, "seq"))) || { n: 0 }); seq.n++; await put(tKey(tid, "seq"), seq);
-    o = { id: uid(), no: seq.n, ts: now(), by: me.name, status: "open" };
+    o = { id: cid || uid(), no: seq.n, ts: now(), by: me.name, status: "open" };
+    if (b.off) { o.off = true; o.madeTs = Math.min(now(), +b.off || now()); }
   }
   Object.assign(o, { lines, total, name, phone, ref });
   if (pay) Object.assign(o, { status: "paid", pay, paidTs: now(), cashier: me.name });
   await put(tKey(tid, "orders", o.id), o);
+  await audit(me, pay ? "Bill paid" : old ? "Bill updated" : "Bill saved", `#${o.no} KSh ${total}${pay ? " by " + pay : ""}${b.off ? " (made offline)" : ""}`);
   return { o };
 }
 
@@ -533,13 +556,14 @@ async function aVoid(b, me) {
   await moveStock(me.tid, lineDeltas(o.lines, 1));
   o.status = "void"; o.voidBy = me.name; o.voidTs = now();
   await put(tKey(me.tid, "orders", o.id), o);
+  await audit(me, "Bill voided", `#${o.no} KSh ${o.total}`);
   return { ok: true };
 }
 
 /* ---------- router ---------- */
 const PUBLIC = { status: aStatus, setup: aSetup, login: aLogin, signup: aSignup, pub: aPub, book: aBook };
 const PLATFORM = { p_approve: aPApprove, p_reject: aPReject, p_create: aPCreate, p_status: aPStatus, p_reset: aPReset, p_plan: aPPlan, p_paid: aPPaid, p_settings: aPSettings };
-const HOTEL = { stfreset: aStfReset, cfg: aCfg, add: aAdd, upd: aUpd, del: aDel, order: aOrder, void: aVoid };
+const HOTEL = { cfg: aCfg, add: aAdd, upd: aUpd, del: aDel, order: aOrder, void: aVoid };
 
 module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
