@@ -92,9 +92,9 @@ async function lockHit(key, win) {
 const lockClear = (key) => del("rl:" + key).catch(() => {});
 
 /* ---------- constants ---------- */
-const ROLES = ["waiter", "cashier", "supervisor", "manager", "owner"];
-const SEN = ["owner", "manager", "supervisor"];
-const STF = ["owner", "manager"];
+const ROLES = ["waiter", "reception", "cashier", "supervisor", "manager", "director", "owner"];
+const SEN = ["owner", "director", "manager", "supervisor"];
+const STF = ["owner", "director", "manager"];
 const DEPTS = ["Restaurant", "Bar", "Spa", "Hotel"];
 const PAYS = ["Cash", "M-Pesa", "Card", "Room"];
 const BSTAT = ["Requested", "Confirmed", "Arrived", "Done", "Cancelled"];
@@ -117,6 +117,7 @@ async function emailTaken(email) {
   const admin = await get("p:admin");
   if (admin && admin.email === email) return true;
   if ((await allTenants()).some((t) => t.email === email)) return true;
+  if (await get("p:se:" + email)) return true;
   if ((await list("p:req:")).some((r) => r.status === "pending" && r.email === email)) return true;
   return false;
 }
@@ -186,39 +187,42 @@ async function aSetup(b, ip) {
 }
 
 async function aLogin(b, ip) {
-  if (b.email !== undefined) {
-    const email = lc(b.email), pw = String(b.pw || ""), lk = "em:" + sha(email + ip);
-    await lockCheck(lk, 8, 15 * 60e3);
-    const fail = async () => { await lockHit(lk, 15 * 60e3); throw E(401, "Wrong email or password."); };
-    if (!email || !pw) throw bad("Enter your email and password.");
-    const admin = await get("p:admin");
-    if (admin && admin.email === email) {
-      if (!checkPw(pw, admin.hash)) return fail();
+  const email = lc(b.email), pw = String(b.pw || ""), lk = "em:" + sha(email + ip);
+  await lockCheck(lk, 8, 15 * 60e3);
+  const fail = async () => { await lockHit(lk, 15 * 60e3); throw E(401, "Wrong email or password."); };
+  if (!email || !pw) throw bad("Enter your email and password.");
+  // 1. platform admin
+  const admin = await get("p:admin");
+  if (admin && admin.email === email) {
+    if (!checkPw(pw, admin.hash)) return fail();
+    await lockClear(lk);
+    return { t: sign({ r: "platform", e: email }), me: { name: admin.name, role: "platform" } };
+  }
+  // 2. hotel owner
+  const t = (await allTenants()).find((x) => x.email === email);
+  if (t) {
+    if (!checkPw(pw, t.ownerHash)) return fail();
+    if (t.status !== "active") throw E(401, "This account is suspended. Contact DK Global Tech.");
+    await lockClear(lk);
+    return { t: sign({ r: "owner", tid: t.id }), me: { name: t.owner, role: "owner" } };
+  }
+  // 3. hotel staff (director, manager, reception, cashier, waiter ...)
+  const ix = await get("p:se:" + email);
+  if (ix) {
+    const st = await get("p:tenant:" + ix.tid);
+    const staff = st ? await get(tKey(st.id, "staff", ix.sid)) : null;
+    if (st && staff && staff.pwHash && checkPw(pw, staff.pwHash)) {
+      if (st.status !== "active") throw E(401, "This account is suspended. Contact the hotel owner.");
       await lockClear(lk);
-      return { t: sign({ r: "platform", e: email }), me: { name: admin.name, role: "platform" } };
+      return { t: sign({ r: "staff", tid: st.id, sid: staff.id }), me: { name: staff.name, role: staff.role } };
     }
-    const t = (await allTenants()).find((x) => x.email === email);
-    if (t) {
-      if (!checkPw(pw, t.ownerHash)) return fail();
-      if (t.status !== "active") throw E(401, "This account is suspended. Contact DK Global Tech.");
-      await lockClear(lk);
-      return { t: sign({ r: "owner", tid: t.id }), me: { name: t.owner, role: "owner" } };
-    }
-    const rq = (await list("p:req:")).find((x) => x.email === email && x.status !== "approved");
-    if (rq && checkPw(pw, rq.hash))
-      throw E(401, rq.status === "pending" ? "Your request is still being reviewed. We will approve it soon." : "This request was not approved. Contact DK Global Tech.");
     return fail();
   }
-  const slug = lc(b.h), name = lc(b.name), pin = String(b.pin || "");
-  if (!slug || !name || !pin) throw bad("Enter the hotel code, your name and your PIN.");
-  const lk = "st:" + sha(slug + name + ip);
-  await lockCheck(lk, 8, 15 * 60e3);
-  const t = await tenantBySlug(slug);
-  const staff = t ? (await list(tKey(t.id, "staff") + ":")).find((s) => lc(s.name) === name) : null;
-  if (!t || !staff || !checkPw(pin, staff.pinHash)) { await lockHit(lk, 15 * 60e3); throw E(401, "Wrong hotel code, name or PIN."); }
-  if (t.status !== "active") throw E(401, "This account is suspended. Contact the hotel owner.");
-  await lockClear(lk);
-  return { t: sign({ r: "staff", tid: t.id, sid: staff.id }), me: { name: staff.name, role: staff.role } };
+  // 4. pending or rejected request
+  const rq = (await list("p:req:")).find((x) => x.email === email && x.status !== "approved");
+  if (rq && checkPw(pw, rq.hash))
+    throw E(401, rq.status === "pending" ? "Your request is still being reviewed. We will approve it soon." : "This request was not approved. Contact DK Global Tech.");
+  return fail();
 }
 
 async function aSignup(b, ip) {
@@ -336,6 +340,15 @@ async function aPReset(b) {
 }
 
 /* ---------- actions: hotel ---------- */
+async function aStfReset(b, me) {
+  need(me, STF);
+  const s = await get(tKey(me.tid, "staff", str(b.id, 40)));
+  if (!s) throw bad("Staff member not found.");
+  if (String(b.pw || "").length < 8) throw bad("Password must be at least 8 characters.");
+  if (["owner", "director", "manager"].includes(s.role) && !["owner", "director"].includes(me.role) && s.id !== me.sid) throw bad("Only the owner or a director can reset this password.");
+  s.pwHash = hashPw(b.pw); await put(tKey(me.tid, "staff", s.id), s);
+  return { ok: true };
+}
 async function aSync(b, me) {
   if (me.role === "platform") {
     const reqs = (await list("p:req:")).filter((r) => r.status === "pending" || r.status === "rejected")
@@ -364,7 +377,7 @@ async function aSync(b, me) {
     orders: orders.sort((a, z) => z.ts - a.ts),
     bookings,
     stock: stock.sort(byName),
-    staff: staff.map((s) => ({ id: s.id, name: s.name, role: s.role })).sort(byName),
+    staff: staff.map((s) => ({ id: s.id, name: s.name, role: s.role, email: s.email || "" })).sort(byName),
   };
 }
 
@@ -396,14 +409,18 @@ async function aAdd(b, me) {
   }
   if (c === "staff") {
     need(me, STF);
-    const name = str(it.name, 60), pin = String(it.pin || "").trim(), role = it.role;
+    const name = str(it.name, 60), email = lc(it.email), pw = String(it.pw || ""), role = it.role;
     if (!name) throw bad("Enter the staff name.");
-    if (!/^\d{4,8}$/.test(pin)) throw bad("PIN must be 4 to 8 digits.");
+    if (!emailOk(email)) throw bad("Enter the staff member's email address.");
+    if (pw.length < 8) throw bad("Password must be at least 8 characters.");
     if (!ROLES.includes(role)) throw bad("Choose a role.");
     if (role === "owner" && me.role !== "owner") throw bad("Only the owner can add another owner.");
-    if ((await list(tKey(me.tid, "staff") + ":")).some((s) => lc(s.name) === lc(name))) throw bad("Someone with that name already exists.");
-    const o = { id: uid(), name, role, pinHash: hashPw(pin) };
-    await put(tKey(me.tid, "staff", o.id), o); return { ok: true, id: o.id };
+    if (["director", "manager"].includes(role) && !["owner", "director"].includes(me.role)) throw bad("Only the owner or a director can add a manager or director.");
+    if (await emailTaken(email)) throw bad("That email is already used on the system.");
+    const o = { id: uid(), name, email, role, pwHash: hashPw(pw), ts: now() };
+    await put(tKey(me.tid, "staff", o.id), o);
+    await put("p:se:" + email, { tid: me.tid, sid: o.id });
+    return { ok: true, id: o.id };
   }
   throw bad("Unknown item type.");
 }
@@ -439,6 +456,8 @@ async function aDel(b, me) {
     if (id === me.sid) throw bad("You cannot remove yourself.");
     const s = await get(tKey(me.tid, "staff", id));
     if (s && s.role === "owner" && me.role !== "owner") throw bad("Only the owner can remove an owner.");
+    if (s && ["director", "manager"].includes(s.role) && !["owner", "director"].includes(me.role)) throw bad("Only the owner or a director can remove a manager or director.");
+    if (s && s.email) await del("p:se:" + s.email).catch(() => {});
   }
   await del(tKey(me.tid, c, id));
   return { ok: true };
@@ -520,7 +539,7 @@ async function aVoid(b, me) {
 /* ---------- router ---------- */
 const PUBLIC = { status: aStatus, setup: aSetup, login: aLogin, signup: aSignup, pub: aPub, book: aBook };
 const PLATFORM = { p_approve: aPApprove, p_reject: aPReject, p_create: aPCreate, p_status: aPStatus, p_reset: aPReset, p_plan: aPPlan, p_paid: aPPaid, p_settings: aPSettings };
-const HOTEL = { cfg: aCfg, add: aAdd, upd: aUpd, del: aDel, order: aOrder, void: aVoid };
+const HOTEL = { stfreset: aStfReset, cfg: aCfg, add: aAdd, upd: aUpd, del: aDel, order: aOrder, void: aVoid };
 
 module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
