@@ -175,6 +175,7 @@ async function session(b) {
   }
   const s = await get(tKey(t.id, "staff", p.sid));
   if (!s || svOf(s) !== (p.sv || 0)) throw E(401, "Your access was removed.");
+  if (s.suspended) throw E(401, "Your account is suspended. Contact your manager.");
   return { role: s.role, name: s.name, tid: t.id, sid: s.id, t, _p: p, _s: s };
 }
 async function audit(me, act, detail) {
@@ -245,6 +246,7 @@ async function aLogin(b, ip) {
   const staff = t ? (await list(tKey(t.id, "staff") + ":")).find((s) => lc(s.name) === name) : null;
   if (!t || !staff || !checkPw(pin, staff.pinHash)) { await lockHit(lk, 15 * 60e3); throw E(401, "Wrong hotel code, name or PIN."); }
   if (t.status !== "active") throw E(401, "This account is suspended. Contact the hotel owner.");
+  if (staff.suspended) throw E(401, "Your account is suspended. Contact your manager.");
   await lockClear(lk);
   await audit({ tid: t.id, name: staff.name, role: staff.role }, "Sign in", "Staff sign in");
   return { t: sign({ r: "staff", tid: t.id, sid: staff.id, sv: svOf(staff) }), me: { name: staff.name, role: staff.role } };
@@ -456,7 +458,7 @@ async function aSync(b, me) {
   if (STF.includes(me.role)) pkg = { plan: me.t.plan || "", fee: me.t.fee || 0, period: me.t.period || "month", paidUntil: me.t.paidUntil || 0, pay: ps.pay || "" };
   return {
     me: { name: me.name, role: me.role }, slug: me.t.slug, pkg, plat,
-    cfg: { name: (c && c.name) || me.t.name, phone: (c && c.phone) || "", addr: (c && c.addr) || "", tag: (c && c.tag) || "", foot: (c && c.foot) || "", logo: (c && c.logo) || "", lw: (c && c.lw) || 0, lh: (c && c.lh) || 0 },
+    cfg: { name: (c && c.name) || me.t.name, phone: (c && c.phone) || "", addr: (c && c.addr) || "", tag: (c && c.tag) || "", foot: (c && c.foot) || "", pin: (c && c.pin) || "", email: (c && c.email) || "", thanks: (c && c.thanks) || "", extra: (c && c.extra) || "", logo: (c && c.logo) || "", lw: (c && c.lw) || 0, lh: (c && c.lh) || 0 },
     feat: plat ? Object.fromEntries(MODS.map((k) => [k, true])) : fm, vat: vatOf(c, ps), depts: await deptsOf(tid, ps),
     menu: menu.map((m) => Object.assign({}, m, { left: m.sku && qty[m.sku] !== undefined ? qty[m.sku] : null })).sort(byName),
     orders: orders.sort((a, z) => z.ts - a.ts),
@@ -465,7 +467,7 @@ async function aSync(b, me) {
     stocktakes: sts.sort((a, z) => z.ts - a.ts),
     audit: aud.sort((a, z) => z.ts - a.ts),
     at: now(),
-    staff: staff.map((s) => ({ id: s.id, name: s.name, role: s.role })).sort(byName),
+    staff: staff.map((s) => ({ id: s.id, name: s.name, role: s.role, suspended: !!s.suspended })).sort(byName),
   };
 }
 
@@ -473,7 +475,7 @@ async function aCfg(b, me) {
   need(me, STF);
   const old = (await get(tKey(me.tid, "cfg"))) || {}, c = Object.assign({}, old);
   const pick = (k, n) => { if (b[k] !== undefined) c[k] = str(b[k], n); };
-  pick("name", 80); pick("phone", 30); pick("addr", 120); pick("tag", 200); pick("foot", 200);
+  pick("name", 80); pick("phone", 30); pick("addr", 120); pick("tag", 200); pick("foot", 200); pick("pin", 30); pick("email", 80); pick("thanks", 200); pick("extra", 400);
   if (!c.name) throw bad("Enter the hotel name.");
   if (b.vat !== undefined) { const v = Number(b.vat); if (!isFinite(v) || v < 0 || v > 30) throw bad("VAT must be between 0 and 30."); c.vat = Math.round(v * 100) / 100; }
   if (b.depts !== undefined) { const d = [...new Set((Array.isArray(b.depts) ? b.depts : String(b.depts).split(",")).map((x) => str(x, 20)).filter(Boolean))]; if (!d.length || d.length > 8) throw bad("Enter 1 to 8 sections."); c.depts = d; }
@@ -549,6 +551,12 @@ async function aUpd(b, me) {
       if (rank(patch.role) >= rank("manager") && !TOP.includes(me.role)) throw bad("Only the owner or a director can make a manager.");
       await audit(me, "Role changed", `${s.name}: ${s.role} to ${patch.role}`); s.role = patch.role;
     }
+    if (patch.suspended !== undefined) {
+      if (s.id === me.sid) throw bad("You cannot suspend yourself.");
+      if (s.role === "owner") throw bad("The owner cannot be suspended.");
+      s.suspended = !!patch.suspended; s.sv = svOf(s) + 1;   // sv bump signs them out of every device
+      await audit(me, s.suspended ? "Staff suspended" : "Staff reinstated", s.name);
+    }
     await put(tKey(me.tid, "staff", id), s); return { ok: true };
   }
   need(me, SEN);
@@ -612,16 +620,20 @@ const lineDeltas = (lines, sign) => {
 };
 
 async function aOrder(b, me) {
-  const tid = me.tid, pay = b.pay ? String(b.pay) : null;
-  if (pay) {
-    if (me.role === "waiter") throw bad("Waiters cannot take payment.");
-    if (!PAYS.includes(pay)) throw bad("Choose a payment method.");
-  }
+  const tid = me.tid;
+  let pay = b.pay ? String(b.pay) : null, pays = null;
+  if (Array.isArray(b.pays) && b.pays.length) {   // split / mixed payment, e.g. Cash 50 + M-Pesa 100
+    if (b.pays.length > 6) throw bad("Use at most 6 payment methods on one bill.");
+    pays = b.pays.map((p) => ({ m: String(p && p.m), a: Math.round(+(p && p.a) * 100) / 100, r: str(p && p.r, 40) }));
+    for (const p of pays) if (!PAYS.includes(p.m) || !(p.a > 0) || p.a > 1e9) throw bad("Check the payment methods and amounts.");
+    pay = pays.length === 1 ? pays[0].m : "Split";
+  } else if (pay && !PAYS.includes(pay)) throw bad("Choose a payment method.");
+  if (pay && me.role === "waiter") throw bad("Waiters cannot take payment.");
   const raw = Array.isArray(b.lines) ? b.lines : [];
   if (!raw.length || raw.length > 60) throw bad("Add items first.");
   const name = str(b.name, 80), phone = str(b.phone, 30), ref = str(b.ref, 60);
   if (pay && digits(phone).length < 9) throw bad("Enter the guest's phone number. It prints on the receipt.");
-  if (pay === "Room" && !ref) throw bad("Enter the room number first.");
+  if ((pay === "Room" || (pays && pays.some((p) => p.m === "Room"))) && !ref) throw bad("Enter the room number first.");
 
   const cid = /^[a-z0-9]{8,24}$/i.test(String(b.cid || "")) ? String(b.cid) : "";
   if (cid && !b.id) { const dup = await get(tKey(tid, "orders", cid)); if (dup) return { o: dup, dup: true }; }
@@ -644,6 +656,8 @@ async function aOrder(b, me) {
     else throw bad("An item is no longer on the menu. Clear the bill and start again.");
   }
   const total = Math.round(lines.reduce((a, l) => a + l.p * l.q, 0) * 100) / 100;
+  if (pays) { const sum = Math.round(pays.reduce((a, p) => a + p.a, 0) * 100) / 100; if (Math.abs(sum - total) > 0.009) throw bad(`The payments (KSh ${sum}) must add up to the bill total (KSh ${total}).`); }
+  else if (pay) pays = [{ m: pay, a: total, r: "" }];
 
   const deltas = lineDeltas(lines, -1);
   if (old) { const back = lineDeltas(old.lines, 1); for (const k in back) deltas[k] = (deltas[k] || 0) + back[k]; }
@@ -657,9 +671,9 @@ async function aOrder(b, me) {
     if (b.off) { o.off = true; o.madeTs = Math.min(now(), +b.off || now()); }
   }
   Object.assign(o, { lines, total, name, phone, ref });
-  if (pay) Object.assign(o, { status: "paid", pay, paidTs: now(), cashier: me.name });
+  if (pay) { const vr = vatOf((await get(tKey(tid, "cfg"))) || {}, await pset()); Object.assign(o, { status: "paid", pay, pays, vr, paidTs: now(), cashier: me.name }); }
   await put(tKey(tid, "orders", o.id), o);
-  await audit(me, pay ? "Bill paid" : old ? "Bill updated" : "Bill saved", `#${o.no} KSh ${total}${pay ? " by " + pay : ""}${b.off ? " (made offline)" : ""}`);
+  await audit(me, pay ? "Bill paid" : old ? "Bill updated" : "Bill saved", `#${o.no} KSh ${total}${pay ? " by " + pay + (pays && pays.length > 1 ? " (" + pays.map((p) => p.m + " " + p.a).join(" + ") + ")" : "") : ""}${b.off ? " (made offline)" : ""}`);
   return { o };
 }
 
@@ -755,10 +769,54 @@ async function aPPw(b, me) {
   return { ok: true, t: sign({ r: "platform", e: a.email, sv: svOf(a) }) };
 }
 
+/* ---------- sales report (computed on the server from every saved bill) ---------- */
+async function listAll(prefix, cap = 100000) {   // pages through all rows, 1000 at a time
+  const out = [];
+  for (let off = 0; off < cap; off += 1000) {
+    const r = await sb("GET", `?k=like.${enc(prefix + "*")}&select=v&order=k.asc&limit=1000&offset=${off}`);
+    for (const x of r) out.push(x.v);
+    if (r.length < 1000) break;
+  }
+  return out;
+}
+const r2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+async function aReport(b, me) {
+  need(me, SEN); await needFeat(me, "reports");
+  const from = Math.floor(+b.from), to = Math.floor(+b.to), tz = Math.round(+b.tz || 0);
+  if (!isFinite(from) || !isFinite(to) || to < from) throw bad("Choose a valid date range.");
+  if (to - from > 400 * 864e5) throw bad("Choose a range of 13 months or less.");
+  const c = (await get(tKey(me.tid, "cfg"))) || {}, vat0 = vatOf(c, await pset());
+  const all = await listAll(tKey(me.tid, "orders") + ":");
+  const day = (ts) => new Date(ts - tz * 60000).toISOString().slice(0, 10);
+  const M = { pay: {}, dept: {}, cashier: {}, server: {}, items: {}, daily: {} };
+  const add = (m, k, v) => { m[k] = (m[k] || 0) + v; };
+  let gross = 0, vat = 0, count = 0; const voids = { n: 0, total: 0 }, open = { n: 0, total: 0 };
+  for (const o of all) {
+    if (!o || !o.lines) continue;
+    if (o.status === "open") { open.n++; open.total += o.total; continue; }
+    if (o.status === "void") { if (o.voidTs >= from && o.voidTs <= to) { voids.n++; voids.total += o.total; } continue; }
+    if (o.status !== "paid" || !(o.paidTs >= from && o.paidTs <= to)) continue;
+    const vr = o.vr != null ? +o.vr : vat0;
+    count++; gross += o.total; vat += o.total * vr / (100 + vr);
+    (o.pays && o.pays.length ? o.pays : [{ m: o.pay || "Other", a: o.total }]).forEach((p) => add(M.pay, p.m === "Room" ? "Room charge" : p.m, p.a));
+    o.lines.forEach((l) => { add(M.dept, l.d || "Other", l.p * l.q); const it = M.items[l.n] || (M.items[l.n] = { q: 0, a: 0 }); it.q += l.q; it.a += l.p * l.q; });
+    add(M.cashier, o.cashier || "-", o.total); add(M.server, o.by || o.cashier || "-", o.total);
+    const d = M.daily[day(o.paidTs)] || (M.daily[day(o.paidTs)] = { n: 0, t: 0 }); d.n++; d.t += o.total;
+  }
+  const arr = (m) => Object.entries(m).map(([k, v]) => [k, r2(v)]).sort((a, z) => z[1] - a[1]);
+  return {
+    from, to, count, gross: r2(gross), vat: r2(vat), net: r2(gross - vat), avg: count ? r2(gross / count) : 0,
+    pay: arr(M.pay), dept: arr(M.dept), cashier: arr(M.cashier), server: arr(M.server),
+    items: Object.entries(M.items).map(([k, v]) => [k, v.q, r2(v.a)]).sort((a, z) => z[2] - a[2]).slice(0, 25),
+    daily: Object.entries(M.daily).map(([k, v]) => [k, v.n, r2(v.t)]).sort((a, z) => a[0].localeCompare(z[0])),
+    voids: { n: voids.n, total: r2(voids.total) }, open: { n: open.n, total: r2(open.total) }, at: now(),
+  };
+}
+
 /* ---------- router ---------- */
 const PUBLIC = { status: aStatus, setup: aSetup, login: aLogin, signup: aSignup, pub: aPub, book: aBook, gorder: aGOrder, ai: aAi };
 const PLATFORM = { p_approve: aPApprove, p_reject: aPReject, p_create: aPCreate, p_status: aPStatus, p_reset: aPReset, p_plan: aPPlan, p_paid: aPPaid, p_settings: aPSettings, p_defaults: aPDefaults, p_tfeat: aPTFeat, p_pw: aPPw, p_profile: aPProfile };
-const HOTEL = { cfg: aCfg, add: aAdd, upd: aUpd, del: aDel, order: aOrder, void: aVoid, st_new: aStNew, st_count: aStCount, st_post: aStPost, st_cancel: aStCancel };
+const HOTEL = { cfg: aCfg, add: aAdd, upd: aUpd, del: aDel, order: aOrder, report: aReport, void: aVoid, st_new: aStNew, st_count: aStCount, st_post: aStPost, st_cancel: aStCancel };
 
 module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
