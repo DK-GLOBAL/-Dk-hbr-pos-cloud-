@@ -207,6 +207,7 @@ async function aSetup(b, ip) {
   if (!emailOk(email)) throw bad("Enter a valid email address.");
   if (pw.length < 8) throw bad("Password must be at least 8 characters.");
   if (!(await addNew("p:admin", { name, email, hash: hashPw(pw), ts: now() }))) throw bad("Setup is already done.");
+  await paudit(name, "Sign in", "Platform admin account created");
   return { t: sign({ r: "platform", e: email }), me: { name, role: "platform" } };
 }
 
@@ -218,8 +219,9 @@ async function aLogin(b, ip) {
     if (!email || !pw) throw bad("Enter your email and password.");
     const admin = await get("p:admin");
     if (admin && admin.email === email) {
-      if (!checkPw(pw, admin.hash)) return fail();
+      if (!checkPw(pw, admin.hash)) { await paudit(admin.name, "Failed sign-in", "Wrong password for the platform admin"); return fail(); }
       await lockClear(lk);
+      await paudit(admin.name, "Sign in", "Platform admin sign in");
       return { t: sign({ r: "platform", e: email, sv: svOf(admin) }), me: { name: admin.name, role: "platform" } };
     }
     const t = (await allTenants()).find((x) => x.email === email);
@@ -386,7 +388,8 @@ async function aSync(b, me) {
     const tenants = (await allTenants()).map((t) => ({ id: t.id, slug: t.slug, name: t.name, owner: t.owner, email: t.email, phone: t.phone, status: t.status, ts: t.ts,
       plan: t.plan || "", fee: t.fee || 0, period: t.period || "month", paidUntil: t.paidUntil || 0, feat: t.feat || {} }))
       .sort((a, c) => c.ts - a.ts);
-    return { me: { name: me.name, role: "platform" }, reqs, tenants, pset: (await get("p:settings")) || {} };
+    const paud = (await list("p:audit:", 300)).sort((a, c) => c.ts - a.ts);
+    return { me: { name: me.name, role: "platform" }, reqs, tenants, pset: (await get("p:settings")) || {}, audit: paud };
   }
   const tid = me.tid, sen = SEN.includes(me.role), ps = await pset(), fm = featMap(ps, me.t), plat = !!me.plat, F = (k) => plat || fm[k];
   const [c, menu, orders, bookings, stockAll, staff, aud, sts] = await Promise.all([
@@ -666,9 +669,34 @@ async function aStCancel(b, me) {
   await del(stK(me.tid, st.id)); await audit(me, "Stock take cancelled", st.no); return { ok: true };
 }
 
+/* ---------- platform audit trail ---------- */
+async function paudit(name, act, detail) {
+  try { const id = String(now()).padStart(14, "0") + "-" + uid(); await put("p:audit:" + id, { id, ts: now(), who: name, role: "platform", act, d: str(detail, 300) }); } catch (e) { console.error("paudit", e); }
+}
+const PLOG = { p_approve: "Request approved", p_reject: "Request rejected", p_create: "Client created", p_status: "Client status", p_reset: "Client password reset", p_plan: "Package edited", p_paid: "Marked paid", p_settings: "Payment details changed", p_defaults: "Defaults changed", p_tfeat: "Client features changed", p_pw: "Password changed" };
+async function plog(a, b, me) {
+  let who = "";
+  if (b.id) { const x = (await get("p:tenant:" + str(b.id, 40))) || (await get("p:req:" + str(b.id, 40))); who = x ? x.name : ""; }
+  let act = PLOG[a] || a, d = who;
+  if (a === "p_create") d = str(b.name, 80);
+  if (a === "p_status") act = b.status === "suspended" ? "Client suspended" : "Client activated";
+  if (a === "p_plan" || a === "p_approve") d += `: ${str(b.plan, 40)} KSh ${Number(b.fee) || 0} ${str(b.period, 8)}` + (b.paidUntil ? `, paid until ${str(b.paidUntil, 10)}` : "");
+  if (a === "p_defaults") d = [b.vat !== undefined && `VAT ${b.vat}%`, b.depts !== undefined && `sections ${[].concat(b.depts).join(", ")}`, b.feat && "module switches"].filter(Boolean).join("; ");
+  if (a === "p_tfeat") d = who + ": " + Object.entries(b.feat || {}).map(([k, v]) => `${k} ${v}`).join(", ");
+  if (a === "p_settings") d = "Payment details, contact or site address updated";
+  if (a === "p_pw") d = "Own password changed";
+  await paudit(me.name, act, d);
+}
+async function aPPw(b, me) {
+  if (!checkPw(String(b.cur || ""), me._a.hash)) throw bad("Your current password is wrong.");
+  if (String(b.pw || "").length < 8) throw bad("New password must be at least 8 characters.");
+  const a = me._a; a.hash = hashPw(String(b.pw)); a.sv = svOf(a) + 1; await put("p:admin", a);
+  return { ok: true, t: sign({ r: "platform", e: a.email, sv: svOf(a) }) };
+}
+
 /* ---------- router ---------- */
 const PUBLIC = { status: aStatus, setup: aSetup, login: aLogin, signup: aSignup, pub: aPub, book: aBook };
-const PLATFORM = { p_approve: aPApprove, p_reject: aPReject, p_create: aPCreate, p_status: aPStatus, p_reset: aPReset, p_plan: aPPlan, p_paid: aPPaid, p_settings: aPSettings, p_defaults: aPDefaults, p_tfeat: aPTFeat };
+const PLATFORM = { p_approve: aPApprove, p_reject: aPReject, p_create: aPCreate, p_status: aPStatus, p_reset: aPReset, p_plan: aPPlan, p_paid: aPPaid, p_settings: aPSettings, p_defaults: aPDefaults, p_tfeat: aPTFeat, p_pw: aPPw };
 const HOTEL = { cfg: aCfg, add: aAdd, upd: aUpd, del: aDel, order: aOrder, void: aVoid, st_new: aStNew, st_count: aStCount, st_post: aStPost, st_cancel: aStCancel };
 
 module.exports = async function handler(req, res) {
@@ -694,7 +722,7 @@ module.exports = async function handler(req, res) {
       else { me._s.sv = svOf(me._s) + 1; await put(tKey(me.tid, "staff", me.sid), me._s); }
       out = { ok: true };
     }
-    else if (PLATFORM[a]) { if (me.role !== "platform") throw bad("Not allowed."); out = await PLATFORM[a](b, me); }
+    else if (PLATFORM[a]) { if (me.role !== "platform") throw bad("Not allowed."); out = await PLATFORM[a](b, me); await plog(a, b, me); }
     else if (HOTEL[a]) { if (me.role === "platform") throw bad("Not allowed."); out = await HOTEL[a](b, me); }
     else return send(400, { err: "Unknown request." });
     if (me._p && out && typeof out === "object" && now() - (me._p.iat || 0) > 12 * 3600e3) out.nt = sign({ r: me._p.r, e: me._p.e, tid: me._p.tid, sid: me._p.sid, sv: me._p.sv });
