@@ -264,7 +264,61 @@ async function aPub(b) {
   const t = await tenantBySlug(b.h);
   if (!t || t.status !== "active") throw E(404, "Hotel not found. Check the link.");
   const c = (await get(tKey(t.id, "cfg"))) || {};
-  return { name: c.name || t.name, tag: c.tag || DEFAULT_TAG, phone: c.phone || t.phone || "", addr: c.addr || t.loc || "", logo: c.logo || "", lw: c.lw || 0, lh: c.lh || 0 };
+  const menu = (await list(tKey(t.id, "menu") + ":")).map((m) => ({ id: m.id, name: m.name, price: m.price, dept: m.dept })).sort((a, z) => String(a.name).localeCompare(String(z.name)));
+  return { name: c.name || t.name, tag: c.tag || DEFAULT_TAG, phone: c.phone || t.phone || "", addr: c.addr || t.loc || "", logo: c.logo || "", lw: c.lw || 0, lh: c.lh || 0, menu };
+}
+/* ---------- DK AI Agent: guest orders and chat ---------- */
+async function aGOrder(b, ip) {
+  const t = await tenantBySlug(b.h);
+  if (!t || t.status !== "active") throw E(404, "Hotel not found. Check the link.");
+  if (!featMap(await pset(), t).bookings) throw E(404, "Online ordering is not available for this hotel.");
+  await lockCheck("go:" + sha(ip), 12, 3600e3);
+  const name = str(b.name, 80), phone = str(b.phone, 30), where = str(b.where, 60);
+  if (!name) throw bad("Enter your name.");
+  if (digits(phone).length < 9) throw bad("Enter a valid phone number.");
+  const menu = await list(tKey(t.id, "menu") + ":");
+  const lines = (Array.isArray(b.lines) ? b.lines : []).slice(0, 30).map((l) => {
+    const m = menu.find((x) => x.id === str(l && l.id, 40)), q = Math.min(Math.max(Math.round(+(l && l.q)) || 0, 0), 50);
+    return m && q ? { n: m.name, p: m.price, q } : null;
+  }).filter(Boolean);
+  if (!lines.length) throw bad("Your order is empty.");
+  const total = lines.reduce((a, l) => a + l.p * l.q, 0), id = uid(), ref = "OR" + crypto.randomBytes(3).toString("hex").toUpperCase();
+  const eat = new Date(now() + 3 * 3600e3).toISOString();
+  await put(tKey(t.id, "bookings", id), { id, ref, service: "Guest order", date: eat.slice(0, 10), time: eat.slice(11, 16), guests: 1, name, phone, email: "", notes: str(`Order: ${lines.map((l) => l.q + "x " + l.n).join(", ")} | Total KSh ${total}` + (where ? ` | For: ${where}` : ""), 500), status: "Requested", ts: now() });
+  await lockHit("go:" + sha(ip), 3600e3);
+  return { ref, total };
+}
+async function aAi(b, ip) {
+  const key = process.env.ANTHROPIC_API_KEY || "";
+  if (!key) return { fallback: true };
+  await lockCheck("ai:" + sha(ip), 60, 3600e3);
+  let sys, menu = [];
+  if (b.h) {
+    const t = await tenantBySlug(b.h);
+    if (!t || t.status !== "active") throw E(404, "Hotel not found.");
+    const c = (await get(tKey(t.id, "cfg"))) || {};
+    menu = (await list(tKey(t.id, "menu") + ":")).slice(0, 120);
+    sys = `You are DK AI Agent for ${c.name || t.name}. Help guests order items and answer questions about the hotel. Menu (id | name | price KSh | section):\n${menu.map((m) => `${m.id} | ${m.name} | ${m.price} | ${m.dept}`).join("\n") || "(no menu published yet)"}\nOnly offer items on this menu. When the guest has clearly decided what to order, confirm the items and add one last line exactly: ORDER_JSON:[{"id":"<id>","q":<number>}] using ids from the menu. Never add that line otherwise. The guest then enters their name and phone on the page to place the order; never ask for payment details. Hotel phone: ${c.phone || t.phone || "not listed"}. Keep answers short, plain text, no markdown. Reply in the guest's language.`;
+  } else {
+    sys = "You are DK AI Agent for DK HBR POS, a hotel, bar and restaurant system by DK Global Tech in Kenya. Facts: online guest booking; POS with cash, M-Pesa, card and room charge; stock that deducts on every sale with low-stock alerts; roles (owner, director, manager, supervisor, cashier, reception, waiter); full audit trail; works offline and installs on phone or computer; printable receipts showing the guest phone number; each hotel gets its own booking page; accounts are requested on the site and approved by DK Global Tech. Pricing varies, so for quotes or a demo ask the visitor to call or WhatsApp 0780490437. Never invent prices, features or promises. Keep answers short, friendly, plain text, no markdown. Reply in the user's language (English or Swahili).";
+  }
+  let msgs = (Array.isArray(b.msgs) ? b.msgs : []).slice(-12).map((m) => ({ role: m && m.role === "assistant" ? "assistant" : "user", content: str(m && m.content, 600) })).filter((m) => m.content);
+  while (msgs.length && msgs[0].role !== "user") msgs.shift();
+  if (!msgs.length) throw bad("Say something first.");
+  await lockHit("ai:" + sha(ip), 3600e3);
+  try {
+    const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" }, body: JSON.stringify({ model: process.env.AI_MODEL || "claude-sonnet-5-5", max_tokens: 500, system: sys, messages: msgs }) });
+    const j = await r.json();
+    let text = ((j.content || []).find((x) => x.type === "text") || {}).text || "";
+    if (!r.ok || !text) return { fallback: true };
+    let order = null;
+    const m = text.match(/ORDER_JSON:\s*(\[[\s\S]*\])/);
+    if (m) {
+      text = text.replace(m[0], "").trim();
+      try { order = JSON.parse(m[1]).map((o) => ({ id: str(o.id, 40), q: Math.min(Math.max(Math.round(+o.q) || 1, 1), 50) })).filter((o) => menu.some((x) => x.id === o.id)); } catch (e) { order = null; }
+    }
+    return { reply: text, order };
+  } catch (e) { console.error("ai", e); return { fallback: true }; }
 }
 
 async function aBook(b, ip) {
@@ -673,7 +727,7 @@ async function aStCancel(b, me) {
 async function paudit(name, act, detail) {
   try { const id = String(now()).padStart(14, "0") + "-" + uid(); await put("p:audit:" + id, { id, ts: now(), who: name, role: "platform", act, d: str(detail, 300) }); } catch (e) { console.error("paudit", e); }
 }
-const PLOG = { p_approve: "Request approved", p_reject: "Request rejected", p_create: "Client created", p_status: "Client status", p_reset: "Client password reset", p_plan: "Package edited", p_paid: "Marked paid", p_settings: "Payment details changed", p_defaults: "Defaults changed", p_tfeat: "Client features changed", p_pw: "Password changed" };
+const PLOG = { p_approve: "Request approved", p_reject: "Request rejected", p_create: "Client created", p_status: "Client status", p_reset: "Client password reset", p_plan: "Package edited", p_paid: "Marked paid", p_settings: "Payment details changed", p_defaults: "Defaults changed", p_tfeat: "Client features changed", p_pw: "Password changed", p_profile: "Profile changed" };
 async function plog(a, b, me) {
   let who = "";
   if (b.id) { const x = (await get("p:tenant:" + str(b.id, 40))) || (await get("p:req:" + str(b.id, 40))); who = x ? x.name : ""; }
@@ -685,7 +739,14 @@ async function plog(a, b, me) {
   if (a === "p_tfeat") d = who + ": " + Object.entries(b.feat || {}).map(([k, v]) => `${k} ${v}`).join(", ");
   if (a === "p_settings") d = "Payment details, contact or site address updated";
   if (a === "p_pw") d = "Own password changed";
+  if (a === "p_profile") d = `Name changed to ${str(b.name, 80)}`;
   await paudit(me.name, act, d);
+}
+async function aPProfile(b, me) {
+  const name = str(b.name, 80);
+  if (!name) throw bad("Enter your name.");
+  const a = me._a; a.name = name; await put("p:admin", a);
+  return { ok: true, name };
 }
 async function aPPw(b, me) {
   if (!checkPw(String(b.cur || ""), me._a.hash)) throw bad("Your current password is wrong.");
@@ -695,8 +756,8 @@ async function aPPw(b, me) {
 }
 
 /* ---------- router ---------- */
-const PUBLIC = { status: aStatus, setup: aSetup, login: aLogin, signup: aSignup, pub: aPub, book: aBook };
-const PLATFORM = { p_approve: aPApprove, p_reject: aPReject, p_create: aPCreate, p_status: aPStatus, p_reset: aPReset, p_plan: aPPlan, p_paid: aPPaid, p_settings: aPSettings, p_defaults: aPDefaults, p_tfeat: aPTFeat, p_pw: aPPw };
+const PUBLIC = { status: aStatus, setup: aSetup, login: aLogin, signup: aSignup, pub: aPub, book: aBook, gorder: aGOrder, ai: aAi };
+const PLATFORM = { p_approve: aPApprove, p_reject: aPReject, p_create: aPCreate, p_status: aPStatus, p_reset: aPReset, p_plan: aPPlan, p_paid: aPPaid, p_settings: aPSettings, p_defaults: aPDefaults, p_tfeat: aPTFeat, p_pw: aPPw, p_profile: aPProfile };
 const HOTEL = { cfg: aCfg, add: aAdd, upd: aUpd, del: aDel, order: aOrder, void: aVoid, st_new: aStNew, st_count: aStCount, st_post: aStPost, st_cancel: aStCancel };
 
 module.exports = async function handler(req, res) {
