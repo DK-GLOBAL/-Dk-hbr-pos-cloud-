@@ -187,7 +187,7 @@ async function audit(me, act, detail) {
 const need = (me, roles) => { if (!roles.includes(me.role)) throw bad("Your role cannot do this."); };
 
 /* ---------- features, sections, VAT ---------- */
-const MODS = ["bookings", "inventory", "stocktake", "menu", "reports", "audit", "staff"];
+const MODS = ["bookings", "inventory", "stocktake", "menu", "reports", "audit", "staff", "hr"];
 const pset = async () => (await get("p:settings")) || {};
 function featMap(ps, t) { const o = {}; MODS.forEach((k) => { const tv = t && t.feat && t.feat[k]; o[k] = tv !== undefined ? !!tv : !(ps.feat && ps.feat[k] === false); }); return o; }
 async function needFeat(me, mod) { if (me.plat) return; if (!featMap(await pset(), me.t)[mod]) throw bad("This feature is switched off for your account. Contact DK Global Tech."); }
@@ -813,10 +813,95 @@ async function aReport(b, me) {
   };
 }
 
+/* ---------- HR: employees, attendance, leave, payroll, recruitment, performance, discipline ---------- */
+const HR_DEF = { workDays: 26, annual: 21, nssfRate: 6, nssfCap: 108000, shifRate: 2.75, shifMin: 300, ahlRate: 1.5, relief: 2400 };   // Kenya 2026 statutory rates; editable in HR > Settings
+const HR_TYPES = ["Annual", "Sick", "Maternity", "Paternity", "Compassionate", "Study", "Unpaid"], HR_DISC = ["Note", "Commendation", "Verbal warning", "Written warning", "Final warning", "Suspension"], HR_STAGE = ["Applied", "Interview", "Offer", "Hired", "Rejected"];
+const hrK = (me, c, id) => (me.role === "platform" ? "p:hr:" : tKey(me.tid, "hr") + ":") + c + (id ? ":" + id : "");
+const hrNum = (v, max = 1e9) => { const n = Number(v === "" || v == null ? 0 : v); if (!isFinite(n) || n < 0 || n > max) throw bad("Check the numbers you entered."); return Math.round(n * 100) / 100; };
+const hrDate = (v, req) => { v = str(v, 10); if (!v && !req) return ""; if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) throw bad("Check the dates."); return v; };
+const hrCfg = async (me) => Object.assign({}, HR_DEF, (await get(hrK(me, "cfg"))) || {});
+function hrStat(gross, r, on) {   // NSSF, SHIF and Housing Levy come off before PAYE
+  if (!on) return { nssf: 0, shif: 0, ahl: 0, paye: 0, nssfEr: 0, ahlEr: 0 };
+  const nssf = r2(Math.min(gross, r.nssfCap) * r.nssfRate / 100), shif = r2(Math.max(gross * r.shifRate / 100, r.shifMin)), ahl = r2(gross * r.ahlRate / 100);
+  const taxable = Math.max(0, gross - nssf - shif - ahl); let tax = 0, prev = 0;
+  for (const [lim, rt] of [[24000, .1], [32333, .25], [500000, .3], [800000, .325], [Infinity, .35]]) { if (taxable > prev) tax += (Math.min(taxable, lim) - prev) * rt; prev = lim; }
+  return { nssf, shif, ahl, paye: Math.max(0, r2(tax - r.relief)), nssfEr: nssf, ahlEr: ahl };
+}
+const HR_SH = {   // what each record type may hold
+  leave: (x) => ({ emp: str(x.emp, 40), type: HR_TYPES.includes(x.type) ? x.type : "Annual", from: hrDate(x.from, 1), to: hrDate(x.to, 1), days: hrNum(x.days, 365) || 1, reason: str(x.reason, 200), status: ["Pending", "Approved", "Rejected"].includes(x.status) ? x.status : "Pending" }),
+  rev: (x) => ({ emp: str(x.emp, 40), period: str(x.period, 30), scores: (Array.isArray(x.scores) ? x.scores : []).slice(0, 5).map((n) => Math.min(5, Math.max(1, Math.round(+n) || 3))), goals: str(x.goals, 400), notes: str(x.notes, 500) }),
+  disc: (x) => ({ emp: str(x.emp, 40), kind: HR_DISC.includes(x.kind) ? x.kind : "Note", date: hrDate(x.date, 1), details: str(x.details, 500) }),
+  job: (x) => ({ title: str(x.title, 80), dept: str(x.dept, 40), open: x.open !== false, desc: str(x.desc, 500), apps: (Array.isArray(x.apps) ? x.apps : []).slice(0, 200).map((a) => ({ id: str(a.id, 20) || uid(), name: str(a.name, 80), phone: str(a.phone, 30), email: str(a.email, 80), stage: HR_STAGE.includes(a.stage) ? a.stage : "Applied", note: str(a.note, 200) })) }),
+};
+async function aHr(b, me) {
+  const plat = me.role === "platform";
+  if (!plat) { need(me, STF); await needFeat(me, "hr"); }
+  const op = str(b.op, 20), id = str(b.id, 40), L = (c, n) => list(hrK(me, c) + ":", n || 1000);
+  const A = (act, d) => (plat ? paudit(me.name, act, d) : audit(me, act, d));
+  if (op === "load") {
+    const [cfg, emps, leaves, att, runs, jobs, revs, discs] = await Promise.all([hrCfg(me), L("emp"), L("leave"), L("att", 130), L("pay", 24), L("job"), L("rev"), L("disc")]);
+    return { cfg, emps, leaves, att, runs, jobs, revs, discs, at: now() };
+  }
+  if (op === "emp_save") {
+    const e = b.emp || {}, name = str(e.name, 80); if (!name) throw bad("Enter the employee name.");
+    const o = Object.assign((id && (await get(hrK(me, "emp", id)))) || {}, {
+      name, phone: str(e.phone, 30), idno: str(e.idno, 20), kra: str(e.kra, 20), nssfNo: str(e.nssfNo, 20), shifNo: str(e.shifNo, 20), title: str(e.title, 60), dept: str(e.dept, 40),
+      type: ["Permanent", "Contract", "Casual", "Intern"].includes(e.type) ? e.type : "Permanent", start: hrDate(e.start), end: hrDate(e.end), dob: hrDate(e.dob),
+      salary: hrNum(e.salary), allow: hrNum(e.allow), bank: str(e.bank, 80), kin: str(e.kin, 80), kinPhone: str(e.kinPhone, 30), notes: str(e.notes, 300),
+      status: ["Active", "On leave", "Suspended", "Exited"].includes(e.status) ? e.status : "Active", stat: !(e.stat === false || e.stat === "no"),
+    });
+    if (!o.id) { if ((await L("emp")).length >= 300) throw bad("Employee limit reached."); o.id = uid(); o.ts = now(); }
+    await put(hrK(me, "emp", o.id), o); await A("HR employee", `${o.name} saved`); return { ok: true, id: o.id };
+  }
+  if (HR_SH[op && op.replace("_save", "")] && op.endsWith("_save")) {
+    const c = op.replace("_save", ""), x = HR_SH[c](b.item || {}), old = id ? await get(hrK(me, c, id)) : null;
+    if (c !== "job" && !(await get(hrK(me, "emp", x.emp)))) throw bad("Choose an employee.");
+    if (c === "job" && !x.title) throw bad("Enter the job title.");
+    if (c === "leave" && x.to < x.from) throw bad("The end date is before the start date.");
+    const o = Object.assign(old || { id: uid(), ts: now(), by: me.name }, x);
+    if (c === "leave" && old && old.status !== o.status) o.dec = me.name;
+    await put(hrK(me, c, o.id), o); await A("HR " + c, `${o.title || o.emp}${c === "leave" ? " " + o.status : ""}`); return { ok: true, id: o.id };
+  }
+  if (op === "att") {
+    const date = hrDate(b.date, 1), m = {}, emps = new Set((await L("emp")).map((e) => e.id));
+    Object.entries(b.m && typeof b.m === "object" ? b.m : {}).forEach(([k, v]) => { if (emps.has(k) && ["P", "A", "H", "L", "O"].includes(v)) m[k] = v; });
+    await put(hrK(me, "att", date), { date, m, by: me.name }); await A("HR attendance", `${date}: ${Object.keys(m).length} marked`); return { ok: true };
+  }
+  if (op === "cfg") {
+    const c = {}; Object.keys(HR_DEF).forEach((k) => { c[k] = hrNum(b.cfg && b.cfg[k] !== undefined ? b.cfg[k] : HR_DEF[k], 1e7); });
+    if (c.workDays < 20 || c.workDays > 31) throw bad("Working days must be 20 to 31.");
+    await put(hrK(me, "cfg"), c); await A("HR settings", "Rates changed"); return { ok: true };
+  }
+  if (op === "pay_run") {
+    const month = str(b.month, 7); if (!/^\d{4}-\d{2}$/.test(month)) throw bad("Choose the month.");
+    const ex = await get(hrK(me, "pay", month)); if (ex && ex.status === "posted") throw bad("This month is already posted and locked.");
+    const cfg = await hrCfg(me), emps = (await L("emp")).filter((e) => e.status === "Active" || e.status === "On leave");
+    if (!emps.length) throw bad("Add active employees first.");
+    const att = await list(hrK(me, "att") + ":" + month, 40), absent = (eid) => att.reduce((a, d) => a + (d.m[eid] === "A" ? 1 : d.m[eid] === "H" ? .5 : 0), 0);
+    const adj = b.adj && typeof b.adj === "object" ? b.adj : (ex && ex.adj) || {}, lines = emps.map((e) => {
+      const a = adj[e.id] || {}, bonus = hrNum(a.bonus, 1e7), adv = hrNum(a.adv, 1e7), oth = hrNum(a.oth, 1e7), ab = absent(e.id), base = (e.salary || 0) + (e.allow || 0);
+      const unpaid = r2(base / cfg.workDays * ab), gross = r2(Math.max(0, base - unpaid + bonus)), s = hrStat(gross, cfg, e.stat !== false);
+      return Object.assign({ id: e.id, name: e.name, title: e.title || "", basic: e.salary || 0, allow: e.allow || 0, bonus, absent: ab, unpaid, gross, adv, oth }, s, { net: r2(gross - s.nssf - s.shif - s.ahl - s.paye - adv - oth) });
+    });
+    const run = { month, status: "draft", lines, adj, ts: now(), by: me.name };
+    await put(hrK(me, "pay", month), run); await A("HR payroll", `${month} calculated for ${lines.length}`); return { ok: true };
+  }
+  if (op === "pay_post") {
+    const run = await get(hrK(me, "pay", str(b.month, 7))); if (!run) throw bad("Run payroll first.");
+    run.status = "posted"; run.postTs = now(); run.postBy = me.name; await put(hrK(me, "pay", run.month), run); await A("HR payroll", `${run.month} posted`); return { ok: true };
+  }
+  if (op === "del") {
+    const c = str(b.c, 10); if (!["emp", "leave", "job", "rev", "disc", "pay"].includes(c)) throw bad("Unknown record.");
+    const old = await get(hrK(me, c, id)); if (c === "pay" && old && old.status === "posted") throw bad("A posted payroll cannot be deleted.");
+    await del(hrK(me, c, id)); await A("HR deleted", `${c} ${(old && (old.name || old.title || old.month)) || id}`); return { ok: true };
+  }
+  throw bad("Unknown HR request.");
+}
+
 /* ---------- router ---------- */
 const PUBLIC = { status: aStatus, setup: aSetup, login: aLogin, signup: aSignup, pub: aPub, book: aBook, gorder: aGOrder, ai: aAi };
-const PLATFORM = { p_approve: aPApprove, p_reject: aPReject, p_create: aPCreate, p_status: aPStatus, p_reset: aPReset, p_plan: aPPlan, p_paid: aPPaid, p_settings: aPSettings, p_defaults: aPDefaults, p_tfeat: aPTFeat, p_pw: aPPw, p_profile: aPProfile };
-const HOTEL = { cfg: aCfg, add: aAdd, upd: aUpd, del: aDel, order: aOrder, report: aReport, void: aVoid, st_new: aStNew, st_count: aStCount, st_post: aStPost, st_cancel: aStCancel };
+const PLATFORM = { p_approve: aPApprove, p_reject: aPReject, p_create: aPCreate, p_status: aPStatus, p_reset: aPReset, p_plan: aPPlan, p_paid: aPPaid, p_settings: aPSettings, p_defaults: aPDefaults, p_tfeat: aPTFeat, p_pw: aPPw, p_profile: aPProfile, p_hr: aHr };
+const HOTEL = { cfg: aCfg, add: aAdd, upd: aUpd, del: aDel, order: aOrder, report: aReport, void: aVoid, st_new: aStNew, st_count: aStCount, st_post: aStPost, st_cancel: aStCancel, hr: aHr };
 
 module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
@@ -841,7 +926,7 @@ module.exports = async function handler(req, res) {
       else { me._s.sv = svOf(me._s) + 1; await put(tKey(me.tid, "staff", me.sid), me._s); }
       out = { ok: true };
     }
-    else if (PLATFORM[a]) { if (me.role !== "platform") throw bad("Not allowed."); out = await PLATFORM[a](b, me); await plog(a, b, me); }
+    else if (PLATFORM[a]) { if (me.role !== "platform") throw bad("Not allowed."); out = await PLATFORM[a](b, me); if (a !== "p_hr") await plog(a, b, me); }
     else if (HOTEL[a]) { if (me.role === "platform") throw bad("Not allowed."); out = await HOTEL[a](b, me); }
     else return send(400, { err: "Unknown request." });
     if (me._p && out && typeof out === "object" && now() - (me._p.iat || 0) > 12 * 3600e3) out.nt = sign({ r: me._p.r, e: me._p.e, tid: me._p.tid, sid: me._p.sid, sv: me._p.sv });
