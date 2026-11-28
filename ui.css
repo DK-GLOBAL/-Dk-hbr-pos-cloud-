@@ -1,0 +1,55 @@
+/* DK HBR POS - segmented layout. Loads after the main styles in index.html; delete this link to go back to the old look. */
+body{background:#f2f0e8}
+.mut{color:#5d655a}
+/* ---------- App shell ---------- */
+#app{max-width:1180px;padding:16px 16px 28px}
+#app>.top{background:#fff;border:1px solid var(--line);border-radius:18px;padding:12px 16px;box-shadow:0 2px 14px rgba(16,40,43,.06);margin-bottom:12px}
+#app>.top .serif,#app>.top h1,#app>.top h2{letter-spacing:.2px}
+#app>.top .chip{background:#f4f1e8;border-color:transparent;font-weight:600}
+@media(min-width:701px){
+  .tabs{background:#fff;border:1px solid var(--line);border-radius:16px;padding:6px;gap:4px;margin:0 0 14px;box-shadow:0 2px 14px rgba(16,40,43,.06)}
+  .tabs .chip{border:0;background:transparent;border-radius:12px;color:#44504c;font-weight:600}
+  .tabs .chip:hover{background:#f4f1e8}
+  .tabs .chip.on{background:linear-gradient(135deg,var(--ink),#1d4b50);color:#fff;box-shadow:0 5px 14px rgba(16,40,43,.28)}
+}
+/* ---------- Segments: every card gets a header band ---------- */
+#v .card{border-color:#e6e0d2;border-radius:16px;box-shadow:0 1px 8px rgba(16,40,43,.05)}
+#v .card>b:first-child{display:block;margin:-16px -16px 12px;padding:11px 16px;background:linear-gradient(#faf8f2,#f3efe4);border-bottom:1px solid var(--line);border-radius:16px 16px 0 0;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
+#v .mets{gap:10px}#v .met{border-radius:16px;background:#fff}#v .met b{font-family:"Playfair Display",Georgia,serif}
+/* ---------- New bill screen ---------- */
+.split{gap:14px;align-items:start}
+.split>.card:first-child::before,.split>.card:last-child::before{display:block;margin:-16px -16px 14px;padding:11px 16px;background:linear-gradient(#faf8f2,#f3efe4);border-bottom:1px solid var(--line);border-radius:16px 16px 0 0;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
+.split>.card:first-child::before{content:"Menu"}
+.split>.card:last-child::before{content:"Order and payment"}
+.split .chips{display:inline-flex;flex-wrap:wrap;gap:2px;background:#eef1ea;padding:4px;border-radius:14px;margin:0 0 12px}
+.split .chips .chip{border:0;background:transparent;border-radius:10px;color:#44504c;font-weight:600}
+.split .chips .chip.on{background:#fff;color:var(--ink);box-shadow:0 2px 8px rgba(16,40,43,.15)}
+.item{background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(16,40,43,.05);transition:transform .15s,box-shadow .15s,border-color .15s}
+.item:hover{transform:translateY(-2px);border-color:var(--t);box-shadow:0 8px 18px rgba(16,40,43,.12)}
+.item b{font-weight:600}.item span{color:var(--t);font-weight:700}
+.pay button:nth-child(1){background:#2e661c}.pay button:nth-child(2){background:#2f9e3f}.pay button:nth-child(3){background:#1a7f8c}.pay button:nth-child(4){background:#b87400}
+.pay button,.go{border-radius:10px;box-shadow:0 2px 8px rgba(16,40,43,.15)}
+/* ---------- Landing page segments ---------- */
+.nav{box-shadow:0 2px 18px rgba(0,0,0,.25)}
+.sec{padding:78px 0}
+.sec .eyebrow{display:inline-block;background:rgba(245,106,15,.11);padding:5px 14px;border-radius:999px;letter-spacing:.16em;font-weight:600}
+.sec h2:after{content:"";display:block;width:58px;height:3px;border-radius:3px;background:linear-gradient(90deg,var(--gold),var(--t));margin:14px auto 0}
+.sec .wrap{text-align:center}.sec .wrap .bk,.sec .wrap details.fq{text-align:left}
+#services{background:linear-gradient(#fff,#f6f4ec)}
+.cards.ft .sv{border-top:4px solid var(--t);border-radius:18px}
+.cards.ft .sv:nth-child(3n+2){border-top-color:var(--g)}.cards.ft .sv:nth-child(3n){border-top-color:var(--gold)}
+.sv i,.cards.ft .sv i{color:var(--g)}.cards.ft .sv i{border-radius:20px;background:linear-gradient(135deg,#e6f0e1,#dcecef)}
+.sv i svg{width:30px;height:30px}
+.how{background:linear-gradient(160deg,#10282b,#173d42)}
+.how .st>div{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.13);border-radius:20px;padding:28px 20px;transition:transform .2s,background .2s}
+.how .st>div:hover{transform:translateY(-4px);background:rgba(255,255,255,.1)}
+#contact{background:linear-gradient(#eaf1e4,#e1ebd9)!important}
+.car{border-radius:22px;box-shadow:0 14px 40px rgba(16,40,43,.12)}
+.cs .ci svg{width:42px;height:42px;color:var(--g)}
+details.fq{border-left:4px solid var(--t);box-shadow:0 2px 10px rgba(16,40,43,.05);transition:border-color .2s}details.fq[open]{border-left-color:var(--gold)}
+.bk{border-radius:22px;border-top:4px solid var(--g);box-shadow:0 16px 44px rgba(16,40,43,.09)}
+.cta{background:linear-gradient(135deg,#2e661c,#1a7f8c 70%,#10282b)}
+footer{background:linear-gradient(#10282b,#0b1d20)}
+.fab svg,.aib svg,.hcall svg,.pills svg{width:16px;height:16px;vertical-align:-3px;margin-right:6px}
+.pills span{display:inline-flex;align-items:center}
+.dkic{display:inline-flex;vertical-align:-0.2em}.dkic svg{width:1.1em;height:1.1em}
