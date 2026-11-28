@@ -231,6 +231,7 @@ async function aLogin(b, ip) {
       if (t.status !== "active") throw E(401, "This account is suspended. Contact DK Global Tech.");
       await lockClear(lk);
       await audit({ tid: t.id, name: t.owner, role: "owner" }, "Sign in", "Owner sign in");
+      await hrClock(t.id, { id: "owner", name: t.owner, role: "owner" });
       return { t: sign({ r: "owner", tid: t.id, sv: svOf(t) }), me: { name: t.owner, role: "owner" } };
     }
     const rq = (await list("p:req:")).find((x) => x.email === email && x.status !== "approved");
@@ -249,6 +250,7 @@ async function aLogin(b, ip) {
   if (staff.suspended) throw E(401, "Your account is suspended. Contact your manager.");
   await lockClear(lk);
   await audit({ tid: t.id, name: staff.name, role: staff.role }, "Sign in", "Staff sign in");
+  await hrClock(t.id, { id: staff.id, name: staff.name, role: staff.role });
   return { t: sign({ r: "staff", tid: t.id, sid: staff.id, sv: svOf(staff) }), me: { name: staff.name, role: staff.role } };
 }
 
@@ -448,6 +450,7 @@ async function aSync(b, me) {
     return { me: { name: me.name, role: "platform" }, reqs, tenants, pset: (await get("p:settings")) || {}, audit: paud };
   }
   const tid = me.tid, sen = SEN.includes(me.role), ps = await pset(), fm = featMap(ps, me.t), plat = !!me.plat, F = (k) => plat || fm[k];
+  if (!plat) await hrSeen(me);
   const [c, menu, orders, bookings, stockAll, staff, aud, sts] = await Promise.all([
     get(tKey(tid, "cfg")), list(tKey(tid, "menu") + ":"), list(tKey(tid, "orders") + ":", 600),
     F("bookings") ? list(tKey(tid, "bookings") + ":", 300) : [], list(tKey(tid, "stock") + ":"), STF.includes(me.role) && F("staff") ? list(tKey(tid, "staff") + ":") : [],
@@ -833,14 +836,29 @@ const HR_SH = {   // what each record type may hold
   disc: (x) => ({ emp: str(x.emp, 40), kind: HR_DISC.includes(x.kind) ? x.kind : "Note", date: hrDate(x.date, 1), details: str(x.details, 500) }),
   job: (x) => ({ title: str(x.title, 80), dept: str(x.dept, 40), open: x.open !== false, desc: str(x.desc, 500), apps: (Array.isArray(x.apps) ? x.apps : []).slice(0, 200).map((a) => ({ id: str(a.id, 20) || uid(), name: str(a.name, 80), phone: str(a.phone, 30), email: str(a.email, 80), stage: HR_STAGE.includes(a.stage) ? a.stage : "Applied", note: str(a.note, 200) })) }),
 };
+/* Every sign-in is also the day's clock-in: HR sees who is working, by name and role */
+const eatDay = (ts) => new Date((ts || now()) + 3 * 3600e3).toISOString().slice(0, 10);   // Kenya date
+const seenAt = new Map();
+async function hrClock(tid, who) {
+  try {
+    const day = eatDay(), k = tKey(tid, "hr", "clock:" + day + ":" + who.id), old = await get(k);
+    if (seenAt.size > 4000) seenAt.clear(); seenAt.set(k, now());
+    if (old) { old.out = now(); await put(k, old); return; }
+    await put(k, { day, sid: who.id, name: who.name, role: who.role, in: now(), out: now() });
+    const emp = (await list(tKey(tid, "hr", "emp") + ":")).find((e) => lc(e.name) === lc(who.name) && (e.status === "Active" || e.status === "On leave"));
+    if (emp) { const ak = tKey(tid, "hr", "att:" + day), a = (await get(ak)) || { date: day, m: {}, by: "Auto sign-in" }; if (!a.m[emp.id]) { a.m[emp.id] = "P"; await put(ak, a); } }
+  } catch (e) { console.error("clock", e); }
+}
+const hrSeen = async (me) => { const id = me.sid || "owner", k = tKey(me.tid, "hr", "clock:" + eatDay() + ":" + id); if (now() - (seenAt.get(k) || 0) > 240e3) await hrClock(me.tid, { id, name: me.name, role: me.role }); };
 async function aHr(b, me) {
   const plat = me.role === "platform";
   if (!plat) { need(me, STF); await needFeat(me, "hr"); }
   const op = str(b.op, 20), id = str(b.id, 40), L = (c, n) => list(hrK(me, c) + ":", n || 1000);
   const A = (act, d) => (plat ? paudit(me.name, act, d) : audit(me, act, d));
   if (op === "load") {
-    const [cfg, emps, leaves, att, runs, jobs, revs, discs] = await Promise.all([hrCfg(me), L("emp"), L("leave"), L("att", 130), L("pay", 24), L("job"), L("rev"), L("disc")]);
-    return { cfg, emps, leaves, att, runs, jobs, revs, discs, at: now() };
+    const [cfg, emps, leaves, att, runs, jobs, revs, discs, clk, stf] = await Promise.all([hrCfg(me), L("emp"), L("leave"), L("att", 130), L("pay", 24), L("job"), L("rev"), L("disc"), plat ? [] : L("clock", 1500), plat ? [] : list(tKey(me.tid, "staff") + ":")]);
+    const cut = eatDay(now() - 40 * 864e5);
+    return { cfg, emps, leaves, att, runs, jobs, revs, discs, clock: clk.filter((x) => x.day >= cut), staff: stf.map((x) => ({ id: x.id, name: x.name, role: x.role, off: !!x.suspended })), at: now() };
   }
   if (op === "emp_save") {
     const e = b.emp || {}, name = str(e.name, 80); if (!name) throw bad("Enter the employee name.");
